@@ -6,6 +6,7 @@ import {
   FileText,
   HardDrive,
   RefreshCw,
+  RotateCcw,
   Save,
   Search,
   ShieldCheck,
@@ -17,6 +18,12 @@ import {
   formatAdminRecordDateTime,
 } from '../lib/adminCompletionRecords';
 import { getErrorMessage } from '../lib/errors';
+import {
+  getSupabaseStateConfig,
+  getSupabaseStateHealth,
+  loadSupabaseState,
+  saveSupabaseState,
+} from '../lib/supabaseState';
 
 interface AdminDataCenterProps {
   createSnapshot: () => FacilityAppState;
@@ -48,6 +55,27 @@ const downloadTextFile = (fileName: string, content: string, type: string) => {
   URL.revokeObjectURL(url);
 };
 
+const buildEmptyOperationalSnapshot = (snapshot: FacilityAppState): FacilityAppState => ({
+  ...snapshot,
+  exportedAt: new Date().toISOString(),
+  tasks: [],
+  notifications: [],
+  dailyLogs: [],
+  syncedTaskIds: [],
+  facilityModule: snapshot.facilityModule
+    ? {
+        ...snapshot.facilityModule,
+        facilities: [],
+        reservations: [],
+        maintenanceRequests: [],
+        inspectionSchedules: [],
+        assets: [],
+        notifications: [],
+        userAccess: snapshot.facilityModule.userAccess,
+      }
+    : snapshot.facilityModule,
+});
+
 export default function AdminDataCenter({
   createSnapshot,
   onApplySnapshot,
@@ -60,6 +88,9 @@ export default function AdminDataCenter({
   const [checking, setChecking] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  const supabaseConfig = getSupabaseStateConfig();
+  const useSupabase = supabaseConfig.enabled;
 
   const snapshot = createSnapshot();
   const completedRecords = useMemo(() => buildCompletedWorkRecords(snapshot), [snapshot]);
@@ -99,6 +130,12 @@ export default function AdminDataCenter({
   const checkServer = async () => {
     setChecking(true);
     try {
+      if (useSupabase) {
+        const data = await getSupabaseStateHealth();
+        setHealth(data);
+        return;
+      }
+
       const response = await fetch('/api/health', { cache: 'no-store' });
       if (!response.ok) throw new Error('공용 저장소 응답이 없습니다.');
       const data = (await response.json()) as ServerHealth;
@@ -126,6 +163,13 @@ export default function AdminDataCenter({
     setSaving(true);
     try {
       const currentSnapshot = createSnapshot();
+      if (useSupabase) {
+        const result = await saveSupabaseState(currentSnapshot, 'admin data center');
+        setHealth(result);
+        addToast('온라인 저장 완료', '현재 작성 내용 전체를 Supabase 공용 저장소에 저장했습니다.', '✅');
+        return;
+      }
+
       const response = await fetch('/api/state', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -153,6 +197,26 @@ export default function AdminDataCenter({
 
     setLoading(true);
     try {
+      if (useSupabase) {
+        const result = await loadSupabaseState();
+        if (!result.hasState || !result.state) {
+          addToast('온라인 데이터 없음', '아직 Supabase 공용 저장소에 저장된 데이터가 없습니다.', 'ℹ️');
+          return;
+        }
+        onApplySnapshot(result.state);
+        setHealth({
+          ok: true,
+          mode: 'supabase',
+          savedAt: result.savedAt,
+          storagePath: supabaseConfig.url,
+          taskCount: result.state.tasks?.length ?? 0,
+          facilityCount: result.state.facilityModule?.facilities?.length ?? 0,
+          reservationCount: result.state.facilityModule?.reservations?.length ?? 0,
+        });
+        addToast('온라인 데이터 반영 완료', 'Supabase 공용 저장소의 내용을 현재 화면에 불러왔습니다.', '✅');
+        return;
+      }
+
       const response = await fetch('/api/state', { cache: 'no-store' });
       if (!response.ok) throw new Error('서버 데이터를 불러오지 못했습니다.');
       const result = await response.json();
@@ -196,6 +260,37 @@ export default function AdminDataCenter({
     addToast('CSV 다운로드 완료', '완료된 업무 목록을 CSV 파일로 내려받았습니다.', '📄');
   };
 
+  const resetTestData = async () => {
+    if (!isAdmin) {
+      addToast('관리자 권한 필요', '테스트 데이터 초기화는 관리자만 사용할 수 있습니다.', '🔒');
+      return;
+    }
+
+    const typed = window.prompt(
+      '테스트 데이터를 초기화합니다. 업무지정, 근무일지, 알림, 시설/일정/자산 데이터가 비워집니다.\n계속하려면 초기화 라고 입력하세요.',
+    );
+    if (typed !== '초기화') return;
+
+    const resetSnapshot = buildEmptyOperationalSnapshot(createSnapshot());
+    setResetting(true);
+    try {
+      onApplySnapshot(resetSnapshot);
+
+      if (useSupabase) {
+        const result = await saveSupabaseState(resetSnapshot, 'reset test data');
+        setHealth(result);
+        addToast('초기화 완료', '테스트 데이터를 비우고 Supabase 공용 저장소에도 저장했습니다.', '✅');
+        return;
+      }
+
+      addToast('초기화 완료', '현재 화면의 테스트 데이터를 비웠습니다. 공용 저장소에 반영하려면 서버 저장을 눌러주세요.', '✅');
+    } catch (error) {
+      addToast('초기화 실패', getErrorMessage(error, '테스트 데이터 초기화 중 문제가 발생했습니다.'), '⚠️');
+    } finally {
+      setResetting(false);
+    }
+  };
+
   return (
     <section className="space-y-5">
       <div className="bg-slate-900/80 border border-slate-700 rounded-3xl p-6 shadow-xl">
@@ -231,7 +326,7 @@ export default function AdminDataCenter({
           </div>
           <div className="mt-4 space-y-3 text-sm text-slate-300 leading-relaxed">
             <p>1. 내용을 입력하면 먼저 현재 브라우저에 자동 저장됩니다.</p>
-            <p>2. <span className="text-emerald-300">현재 데이터 서버 저장</span>을 누르면 팀원 공용 저장소 파일에 저장됩니다.</p>
+            <p>2. <span className="text-emerald-300">{useSupabase ? '현재 데이터 공용 저장' : '현재 데이터 서버 저장'}</span>을 누르면 팀원 공용 저장소에 저장됩니다.</p>
             <p>3. 업무 완료 목록은 서버 전체 데이터 중 완료 업무만 추려서 보여줍니다.</p>
           </div>
         </div>
@@ -241,13 +336,13 @@ export default function AdminDataCenter({
             <div>
               <div className="flex items-center gap-2">
                 <Database className="w-5 h-5 text-emerald-300" />
-                <h3 className="text-white text-base font-semibold">팀원 공용 저장소 상태</h3>
+                <h3 className="text-white text-base font-semibold">{useSupabase ? '온라인 공용 저장소 상태' : '팀원 공용 저장소 상태'}</h3>
               </div>
               <p className="text-sm text-slate-300 mt-2">
-                마지막 서버 저장: <span className="text-white">{formatAdminRecordDateTime(health?.savedAt)}</span>
+                마지막 저장: <span className="text-white">{formatAdminRecordDateTime(health?.savedAt)}</span>
               </p>
               <p className="text-xs text-emerald-300 mt-1 break-all">
-                저장 위치: {health?.storagePath || '서버 실행 후 확인 가능합니다.'}
+                저장 위치: {health?.storagePath || (useSupabase ? 'Supabase 연결 확인 후 표시됩니다.' : '서버 실행 후 확인 가능합니다.')}
               </p>
             </div>
 
@@ -277,7 +372,16 @@ export default function AdminDataCenter({
                 className="px-4 py-3 rounded-xl bg-emerald-600/25 border border-emerald-500/40 text-emerald-100 text-sm font-semibold flex items-center gap-2 disabled:text-slate-500 disabled:border-slate-800 disabled:bg-slate-900"
               >
                 <Save className="w-4 h-4" />
-                {saving ? '저장 중' : '현재 데이터 서버 저장'}
+                {saving ? '저장 중' : useSupabase ? '현재 데이터 공용 저장' : '현재 데이터 서버 저장'}
+              </button>
+              <button
+                type="button"
+                onClick={resetTestData}
+                disabled={resetting || !isAdmin}
+                className="px-4 py-3 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-100 text-sm font-semibold flex items-center gap-2 disabled:text-slate-500 disabled:border-slate-800 disabled:bg-slate-900"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {resetting ? '초기화 중' : '테스트 데이터 초기화'}
               </button>
             </div>
           </div>

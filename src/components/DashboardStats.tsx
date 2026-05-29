@@ -141,6 +141,7 @@ export default function DashboardStats({
                           checked={isAdmin}
                           disabled={!canManageAdminAccess || user.id === currentUserId}
                           onChange={(event) => onAdminAccessChange(user.id, event.target.checked)}
+                          title={canManageAdminAccess ? '나형석 팀장만 관리자 권한을 변경할 수 있습니다.' : '관리자 지정 권한은 나형석 팀장에게만 있습니다.'}
                           className="w-4 h-4 accent-indigo-500 disabled:opacity-40"
                         />
                         관리자

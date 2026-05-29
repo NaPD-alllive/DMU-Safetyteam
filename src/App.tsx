@@ -66,6 +66,8 @@ type AudioContextWindow = Window &
 
 const SHARED_CALENDAR_SYNC_STORAGE_KEY = 'fms_google_synced_tasks_facility_shared';
 const SUPPLY_PURCHASE_REQUEST_URL = 'https://facility-supply-app.vercel.app/request';
+const PRIMARY_ADMIN_USER_ID = 'user_manager';
+const PRIMARY_ADMIN_NAME = '나형석';
 
 const readStoredTasks = () => {
   const saved = localStorage.getItem('fms_tasks');
@@ -114,6 +116,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USERS[0]);
   const facilityAccess = useFacilityUserAccess(users);
   const currentFacilityRole = facilityAccess.getRoleForUser(currentUser);
+  const canManageAdminAccess =
+    currentUser.id === PRIMARY_ADMIN_USER_ID &&
+    currentUser.name === PRIMARY_ADMIN_NAME &&
+    currentFacilityRole === 'admin';
   
   // Tab control state
   const [activeTab, setActiveTab] = useState<'tasks' | 'dailyLogs' | 'facilities' | 'adminData'>('facilities');
@@ -358,8 +364,8 @@ export default function App() {
   }, [applyAppSnapshot]);
 
   const handleTeamAdminAccessChange = (userId: string, isAdmin: boolean) => {
-    if (currentFacilityRole !== 'admin') {
-      addToast('권한 변경 불가', '관리자만 시설관리팀 관리자 권한을 변경할 수 있습니다.', '⚠️');
+    if (!canManageAdminAccess) {
+      addToast('권한 변경 불가', '관리자 지정 권한은 나형석 팀장에게만 있습니다.', '⚠️');
       return;
     }
 
@@ -1044,7 +1050,7 @@ export default function App() {
           users={users} 
           userAccessList={facilityAccess.accessList}
           currentUserId={currentUser.id}
-          canManageAdminAccess={currentFacilityRole === 'admin'}
+          canManageAdminAccess={canManageAdminAccess}
           onAdminAccessChange={handleTeamAdminAccessChange}
         />
 
