@@ -11,6 +11,14 @@ interface SupabaseUserResponse {
   };
 }
 
+interface SupabasePasswordTokenResponse {
+  access_token: string;
+  refresh_token?: string;
+  expires_in?: number;
+  expires_at?: number;
+  user?: SupabaseUserResponse;
+}
+
 export interface SupabaseAuthSession {
   accessToken: string;
   refreshToken?: string;
@@ -18,7 +26,6 @@ export interface SupabaseAuthSession {
 }
 
 const SUPABASE_AUTH_SESSION_KEY = 'fms_supabase_auth_session';
-const PRODUCTION_APP_URL = 'https://dmu-safetyteam.vercel.app';
 
 const getEnv = () => ((import.meta as ImportMetaWithEnv).env ?? {});
 
@@ -29,7 +36,15 @@ const hasBrowserStorage = () => typeof window !== 'undefined' && Boolean(window.
 const readResponseError = async (response: Response) => {
   try {
     const data = await response.json();
-    return data?.msg || data?.message || data?.error_description || data?.error || response.statusText;
+    const message = data?.msg || data?.message || data?.error_description || data?.error || response.statusText;
+    const lowerMessage = String(message).toLowerCase();
+    if (lowerMessage.includes('invalid login credentials')) {
+      return '이메일 또는 비밀번호가 맞지 않습니다. Supabase Authentication > Users에 계정이 생성되어 있는지 확인해 주세요.';
+    }
+    if (lowerMessage.includes('email not confirmed')) {
+      return '이메일 인증이 완료되지 않은 계정입니다. Supabase 사용자 화면에서 Email Confirm 처리를 해 주세요.';
+    }
+    return message;
   } catch {
     return response.statusText;
   }
@@ -61,47 +76,16 @@ export const clearStoredSupabaseAuthSession = () => {
 export const getStoredSupabaseAccessToken = () => {
   const session = readStoredSupabaseAuthSession();
   if (!session) return null;
-  if (session.expiresAt && session.expiresAt * 1000 <= Date.now() + 60_000) return null;
   return session.accessToken;
 };
 
-export const consumeSupabaseAuthRedirect = () => {
-  if (typeof window === 'undefined' || !window.location.hash) return null;
-
-  const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
-  const error = params.get('error_description') || params.get('error');
-  if (error) {
-    window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
-    throw new Error(error);
-  }
-
-  const accessToken = params.get('access_token');
-  if (!accessToken) return null;
-
-  const expiresAt = Number(params.get('expires_at') || 0);
-  const expiresIn = Number(params.get('expires_in') || 0);
-  const session: SupabaseAuthSession = {
-    accessToken,
-    refreshToken: params.get('refresh_token') || undefined,
-    expiresAt: expiresAt || (expiresIn ? Math.floor(Date.now() / 1000) + expiresIn : undefined),
-  };
-
-  storeSupabaseAuthSession(session);
-  window.history.replaceState(null, document.title, `${window.location.pathname}${window.location.search}`);
-  return session;
-};
-
-export const requestSupabaseMagicLink = async (email: string) => {
+export const signInWithSupabasePassword = async (email: string, password: string) => {
   const config = getSupabaseAuthConfig();
   if (!config.enabled) {
     throw new Error(config.reason || 'Supabase 연결 정보가 없습니다.');
   }
 
-  const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
-  const redirectTo = isLocalhost
-    ? PRODUCTION_APP_URL
-    : `${window.location.origin}${window.location.pathname}`;
-  const response = await fetch(`${config.url}/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
+  const response = await fetch(`${config.url}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: {
       apikey: config.anonKey,
@@ -109,13 +93,26 @@ export const requestSupabaseMagicLink = async (email: string) => {
     },
     body: JSON.stringify({
       email,
-      create_user: true,
+      password,
     }),
   });
 
   if (!response.ok) {
     throw new Error(await readResponseError(response));
   }
+
+  const data = (await response.json()) as SupabasePasswordTokenResponse;
+  if (!data.access_token) {
+    throw new Error('로그인 토큰을 받지 못했습니다. Supabase 설정을 확인해 주세요.');
+  }
+
+  storeSupabaseAuthSession({
+    accessToken: data.access_token,
+    refreshToken: data.refresh_token,
+    expiresAt: data.expires_at || (data.expires_in ? Math.floor(Date.now() / 1000) + data.expires_in : undefined),
+  });
+
+  return data.user?.email || email;
 };
 
 export const fetchSupabaseAuthEmail = async (session: SupabaseAuthSession) => {

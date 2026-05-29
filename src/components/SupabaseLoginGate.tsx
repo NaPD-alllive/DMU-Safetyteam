@@ -1,12 +1,11 @@
 import React, { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Loader2, Mail, ShieldCheck } from 'lucide-react';
+import { Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import type { UserProfile } from '../types';
 import {
   clearStoredSupabaseAuthSession,
-  consumeSupabaseAuthRedirect,
   fetchSupabaseAuthEmail,
   readStoredSupabaseAuthSession,
-  requestSupabaseMagicLink,
+  signInWithSupabasePassword,
 } from '../lib/supabaseAuth';
 import { normalizeTeamEmail, resolveTeamUserByEmail } from '../lib/teamMembers';
 
@@ -17,8 +16,8 @@ interface SupabaseLoginGateProps {
 
 export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLoginGateProps) {
   const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<'checking' | 'ready' | 'sending'>('checking');
-  const [notice, setNotice] = useState('');
+  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'checking' | 'ready' | 'signingIn'>('checking');
   const [error, setError] = useState('');
 
   const registeredEmails = useMemo(
@@ -31,7 +30,7 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
 
     const resolveSession = async () => {
       try {
-        const session = consumeSupabaseAuthRedirect() || readStoredSupabaseAuthSession();
+        const session = readStoredSupabaseAuthSession();
         if (!session) {
           if (!cancelled) setStatus('ready');
           return;
@@ -67,7 +66,6 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
     event.preventDefault();
     const normalizedEmail = normalizeTeamEmail(email);
     setError('');
-    setNotice('');
 
     if (!resolveTeamUserByEmail(users, normalizedEmail)) {
       setError('등록된 시설관리팀 이메일만 로그인할 수 있습니다.');
@@ -75,12 +73,17 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
     }
 
     try {
-      setStatus('sending');
-      await requestSupabaseMagicLink(normalizedEmail);
-      setNotice('로그인 링크를 보냈습니다. 메일함에서 Supabase 로그인 메일을 열고 링크를 눌러 주세요.');
-      setStatus('ready');
-    } catch (sendError) {
-      setError(sendError instanceof Error ? sendError.message : '로그인 메일을 보내지 못했습니다.');
+      setStatus('signingIn');
+      const authEmail = normalizeTeamEmail(await signInWithSupabasePassword(normalizedEmail, password));
+      const user = resolveTeamUserByEmail(users, authEmail);
+      if (!user) {
+        clearStoredSupabaseAuthSession();
+        throw new Error('시설관리팀 등록 이메일이 아닙니다. 팀장에게 계정 등록을 요청해 주세요.');
+      }
+
+      onAuthenticated(user, authEmail);
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : '로그인하지 못했습니다.');
       setStatus('ready');
     }
   };
@@ -94,10 +97,10 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
           </div>
           <div>
             <p className="text-sm text-emerald-300 font-semibold">DMU 시설관리팀 인증</p>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">이메일로 본인 확인</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight mt-1">이메일 / 비밀번호 로그인</h1>
             <p className="text-sm sm:text-base text-slate-300 mt-3 leading-relaxed">
-              등록된 동양미래대학교 이메일로 로그인해야 시스템을 사용할 수 있습니다.
-              로그인 후에는 본인 계정으로 고정되어 다른 직원 계정으로 바꿀 수 없습니다.
+              등록된 동양미래대학교 이메일과 비밀번호로 로그인해야 시스템을 사용할 수 있습니다.
+              로그인 메일을 보내지 않기 때문에 Supabase 메일 발송 제한에 걸리지 않습니다.
             </p>
           </div>
         </div>
@@ -131,32 +134,42 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
               </div>
             </label>
 
+            <label className="block">
+              <span className="block text-sm font-bold text-slate-200 mb-2">비밀번호</span>
+              <div className="relative">
+                <Lock className="w-5 h-5 text-slate-500 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Supabase에 등록한 비밀번호"
+                  className="w-full pl-12 pr-4 py-4 rounded-2xl border border-slate-700 bg-slate-950 text-white text-base outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
+            </label>
+
             {error && (
               <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200">
                 {error}
               </div>
             )}
 
-            {notice && (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200">
-                {notice}
-              </div>
-            )}
-
             <button
               type="submit"
-              disabled={status === 'sending'}
+              disabled={status === 'signingIn'}
               className="w-full rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-400 py-4 text-base font-bold text-white transition-colors flex items-center justify-center gap-2"
             >
-              {status === 'sending' && <Loader2 className="w-5 h-5 animate-spin" />}
-              로그인 링크 받기
+              {status === 'signingIn' && <Loader2 className="w-5 h-5 animate-spin" />}
+              로그인
             </button>
           </form>
         )}
 
         <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300 leading-relaxed">
-          메일이 오지 않으면 스팸함을 확인하고, Supabase 인증 설정의 Site URL과 Redirect URL이
-          https://dmu-safetyteam.vercel.app 주소로 되어 있는지 확인해 주세요.
+          초기 계정은 Supabase Authentication &gt; Users에서 관리자가 만들어야 합니다.
+          팀원 이메일을 추가하고 비밀번호를 지정한 뒤, 이메일 인증 완료 상태로 저장해 주세요.
         </div>
       </div>
     </div>

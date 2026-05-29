@@ -291,7 +291,7 @@ export default function App() {
     setCurrentUser(DEFAULT_USERS[0]);
     setIsAuthReady(!requiresSupabaseLogin);
     setShowNotifications(false);
-    addToast('로그아웃 완료', '다시 사용하려면 직원 이메일로 로그인해 주세요.', '🔒');
+    addToast('로그아웃 완료', '다시 사용하려면 직원 이메일과 비밀번호로 로그인해 주세요.', '🔒');
   };
 
   const openSupplyRequest = () => {
@@ -1089,7 +1089,7 @@ export default function App() {
 
       {/* Profile Active Status Alert Bar for Small Screen */}
       <div className="hidden">
-        💡 온라인 앱에서는 등록 이메일로 로그인한 본인 계정 기준으로 완료 보고서와 승인 체계를 사용합니다.
+        💡 온라인 앱에서는 등록 이메일과 비밀번호로 로그인한 본인 계정 기준으로 완료 보고서와 승인 체계를 사용합니다.
       </div>
 
       {/* 2. Main Work Portal Scroll Wrapper */}
