@@ -18,6 +18,7 @@ export interface SupabaseAuthSession {
 }
 
 const SUPABASE_AUTH_SESSION_KEY = 'fms_supabase_auth_session';
+const PRODUCTION_APP_URL = 'https://dmu-safetyteam.vercel.app';
 
 const getEnv = () => ((import.meta as ImportMetaWithEnv).env ?? {});
 
@@ -96,7 +97,10 @@ export const requestSupabaseMagicLink = async (email: string) => {
     throw new Error(config.reason || 'Supabase 연결 정보가 없습니다.');
   }
 
-  const redirectTo = `${window.location.origin}${window.location.pathname}`;
+  const isLocalhost = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+  const redirectTo = isLocalhost
+    ? PRODUCTION_APP_URL
+    : `${window.location.origin}${window.location.pathname}`;
   const response = await fetch(`${config.url}/auth/v1/otp?redirect_to=${encodeURIComponent(redirectTo)}`, {
     method: 'POST',
     headers: {

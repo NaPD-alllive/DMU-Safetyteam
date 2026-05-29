@@ -156,7 +156,7 @@ export default function SupabaseLoginGate({ users, onAuthenticated }: SupabaseLo
 
         <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-950/60 p-4 text-sm text-slate-300 leading-relaxed">
           메일이 오지 않으면 스팸함을 확인하고, Supabase 인증 설정의 Site URL과 Redirect URL이
-          현재 Vercel 주소로 되어 있는지 확인해 주세요.
+          https://dmu-safetyteam.vercel.app 주소로 되어 있는지 확인해 주세요.
         </div>
       </div>
     </div>
