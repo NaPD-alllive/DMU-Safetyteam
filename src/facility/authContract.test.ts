@@ -1,4 +1,6 @@
 import { createFacilityAuthSession, getSessionRole } from './authContract';
+import { DEFAULT_USERS } from '../initialData';
+import { isPrimaryAdminUser, resolveTeamUserByEmail } from '../lib/teamMembers';
 import {
   canManageAssets,
   canManageFacilities,
@@ -58,5 +60,12 @@ assert(resolveSupabaseConfig({
   VITE_SUPABASE_URL: 'https://example.supabase.co',
   VITE_SUPABASE_ANON_KEY: 'valid-anon-key',
 }).enabled, 'valid Supabase config should be enabled');
+
+const primaryAdmin = resolveTeamUserByEmail(DEFAULT_USERS, 'RHS@dongyang.ac.kr');
+const staffUser = resolveTeamUserByEmail(DEFAULT_USERS, 'phc0712@dongyang.ac.kr');
+assert(primaryAdmin?.id === 'user_manager', 'team email should resolve primary admin');
+assert(staffUser?.name === '박희찬', 'team email should resolve staff user');
+assert(Boolean(primaryAdmin && isPrimaryAdminUser(primaryAdmin, 'rhs@dongyang.ac.kr')), 'primary admin email should be accepted');
+assert(Boolean(primaryAdmin && !isPrimaryAdminUser(primaryAdmin, 'phc0712@dongyang.ac.kr')), 'primary admin user id should still require primary admin email online');
 
 console.log('auth contract tests passed');

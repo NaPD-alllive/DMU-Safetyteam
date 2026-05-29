@@ -13,6 +13,7 @@ import SharedDataServerPanel from './components/SharedDataServerPanel';
 import FacilityAdminPage from './components/facility/FacilityAdminPage';
 import SystemManualModal from './components/SystemManualModal';
 import AdminDataCenter from './components/AdminDataCenter';
+import SupabaseLoginGate from './components/SupabaseLoginGate';
 import {
   FACILITY_SHARED_CALENDAR_NAME,
   SHARED_CALENDAR_AUTO_SYNC_KEY,
@@ -24,6 +25,8 @@ import { getErrorMessage } from './lib/errors';
 import { getTaskStatusLabel, isApprovalPending } from './lib/taskState';
 import { formatTaskAssigneeLabel, taskIncludesAssignee } from './lib/taskAssignees';
 import { normalizeWorkCategory } from './lib/workCategories';
+import { clearStoredSupabaseAuthSession } from './lib/supabaseAuth';
+import { isPrimaryAdminUser } from './lib/teamMembers';
 import { getSupabaseStateConfig, loadSupabaseState } from './lib/supabaseState';
 import {
   isFacilityModuleSnapshot,
@@ -45,6 +48,7 @@ import {
   Upload,
   X, 
   ClipboardList,
+  LogOut,
   Volume2,
   VolumeX
 } from 'lucide-react';
@@ -66,8 +70,6 @@ type AudioContextWindow = Window &
 
 const SHARED_CALENDAR_SYNC_STORAGE_KEY = 'fms_google_synced_tasks_facility_shared';
 const SUPPLY_PURCHASE_REQUEST_URL = 'https://facility-supply-app.vercel.app/request';
-const PRIMARY_ADMIN_USER_ID = 'user_manager';
-const PRIMARY_ADMIN_NAME = '나형석';
 
 const readStoredTasks = () => {
   const saved = localStorage.getItem('fms_tasks');
@@ -114,11 +116,14 @@ export default function App() {
 
   const [users] = useState<UserProfile[]>(DEFAULT_USERS);
   const [currentUser, setCurrentUser] = useState<UserProfile>(DEFAULT_USERS[0]);
+  const supabaseStateConfig = useMemo(() => getSupabaseStateConfig(), []);
+  const requiresSupabaseLogin = supabaseStateConfig.enabled;
+  const [isAuthReady, setIsAuthReady] = useState(!requiresSupabaseLogin);
+  const [authenticatedEmail, setAuthenticatedEmail] = useState<string | null>(null);
   const facilityAccess = useFacilityUserAccess(users);
   const currentFacilityRole = facilityAccess.getRoleForUser(currentUser);
   const canManageAdminAccess =
-    currentUser.id === PRIMARY_ADMIN_USER_ID &&
-    currentUser.name === PRIMARY_ADMIN_NAME &&
+    isPrimaryAdminUser(currentUser, requiresSupabaseLogin ? authenticatedEmail : null) &&
     currentFacilityRole === 'admin';
   
   // Tab control state
@@ -274,6 +279,21 @@ export default function App() {
     addToast('알림음 테스트', '이 소리가 들리면 브라우저 알림음이 정상입니다.', '🔔');
   };
 
+  const handleAuthenticatedUser = useCallback((user: UserProfile, email: string) => {
+    setCurrentUser(user);
+    setAuthenticatedEmail(email);
+    setIsAuthReady(true);
+  }, []);
+
+  const handleSignOut = () => {
+    clearStoredSupabaseAuthSession();
+    setAuthenticatedEmail(null);
+    setCurrentUser(DEFAULT_USERS[0]);
+    setIsAuthReady(!requiresSupabaseLogin);
+    setShowNotifications(false);
+    addToast('로그아웃 완료', '다시 사용하려면 직원 이메일로 로그인해 주세요.', '🔒');
+  };
+
   const openSupplyRequest = () => {
     window.location.assign(SUPPLY_PURCHASE_REQUEST_URL);
   };
@@ -329,15 +349,15 @@ export default function App() {
   }, [facilityAccess]);
 
   useEffect(() => {
-    if (hadStoredAppDataRef.current) return;
+    if (requiresSupabaseLogin && !isAuthReady) return;
+    if (!requiresSupabaseLogin && hadStoredAppDataRef.current) return;
     hadStoredAppDataRef.current = true;
 
     let cancelled = false;
 
     const loadInitialSharedState = async () => {
       try {
-        const supabaseConfig = getSupabaseStateConfig();
-        if (supabaseConfig.enabled) {
+        if (supabaseStateConfig.enabled) {
           const result = await loadSupabaseState();
           if (!cancelled && result.hasState && isFacilityAppState(result.state)) {
             applyAppSnapshot(result.state);
@@ -361,7 +381,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [applyAppSnapshot]);
+  }, [applyAppSnapshot, isAuthReady, requiresSupabaseLogin, supabaseStateConfig.enabled]);
 
   const handleTeamAdminAccessChange = (userId: string, isAdmin: boolean) => {
     if (!canManageAdminAccess) {
@@ -860,6 +880,15 @@ export default function App() {
     setShowNotifications(false);
   };
 
+  if (requiresSupabaseLogin && !isAuthReady) {
+    return (
+      <SupabaseLoginGate
+        users={users}
+        onAuthenticated={handleAuthenticatedUser}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans flex flex-col selection:bg-indigo-600/30 selection:text-white">
       
@@ -1015,22 +1044,44 @@ export default function App() {
               )}
             </div>
 
-            {/* Profile Action Selector */}
-            <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1">
-              <div className="relative">
-                <select
-                  value={currentUser.id}
-                  onChange={(e) => handleUserChange(e.target.value)}
-                  className="max-w-[210px] px-3.5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-black font-sans outline-none cursor-pointer border border-slate-700 hover:bg-slate-800 transition-colors shadow-lg"
+            {requiresSupabaseLogin ? (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2">
+                <div className="min-w-0">
+                  <div className="text-[10px] text-slate-400 font-bold leading-tight">로그인 계정</div>
+                  <div className="text-sm text-white font-bold truncate">
+                    {currentUser.avatar} {currentUser.name} {currentUser.role}
+                  </div>
+                  {authenticatedEmail && (
+                    <div className="text-[10px] text-emerald-300 font-semibold truncate">{authenticatedEmail}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+                  title="로그아웃"
+                  aria-label="로그아웃"
                 >
-                  {users.map((u) => (
-                    <option key={u.id} value={u.id} className="text-slate-100 bg-slate-900 font-black text-xs">
-                      {u.avatar} {u.name} {u.role}
-                    </option>
-                  ))}
-                </select>
+                  <LogOut className="w-4 h-4" />
+                </button>
               </div>
-            </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/70 px-2 py-1">
+                <div className="relative">
+                  <select
+                    value={currentUser.id}
+                    onChange={(e) => handleUserChange(e.target.value)}
+                    className="max-w-[210px] px-3.5 py-2.5 bg-slate-900 text-white rounded-xl text-sm font-black font-sans outline-none cursor-pointer border border-slate-700 hover:bg-slate-800 transition-colors shadow-lg"
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.id} className="text-slate-100 bg-slate-900 font-black text-xs">
+                        {u.avatar} {u.name} {u.role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            )}
 
           </div>
         </div>
@@ -1038,7 +1089,7 @@ export default function App() {
 
       {/* Profile Active Status Alert Bar for Small Screen */}
       <div className="hidden">
-        💡 상단 우측 스위처로 계정을 변경하며 완료 보고서와 승인 체계를 시험해보세요.
+        💡 온라인 앱에서는 등록 이메일로 로그인한 본인 계정 기준으로 완료 보고서와 승인 체계를 사용합니다.
       </div>
 
       {/* 2. Main Work Portal Scroll Wrapper */}

@@ -1,5 +1,6 @@
 import { resolveSupabaseConfig } from '../facility/supabaseConfig';
 import type { FacilityAppState } from '../types';
+import { getStoredSupabaseAccessToken } from './supabaseAuth';
 
 interface ImportMetaWithEnv extends ImportMeta {
   env?: Record<string, string | undefined>;
@@ -37,7 +38,7 @@ const buildStoragePath = (url: string) => `${url}/rest/v1/facility_app_state`;
 
 const getHeaders = (anonKey: string) => ({
   apikey: anonKey,
-  Authorization: `Bearer ${anonKey}`,
+  Authorization: `Bearer ${getStoredSupabaseAccessToken() || anonKey}`,
   'Content-Type': 'application/json',
 });
 

@@ -13,6 +13,7 @@ export interface UserProfile {
   role: string;
   specialty: string;
   avatar: string;
+  email?: string;
 }
 
 export interface DailyLogComment {

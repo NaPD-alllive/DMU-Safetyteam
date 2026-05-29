@@ -35,15 +35,15 @@ drop policy if exists facility_app_state_insert on public.facility_app_state;
 drop policy if exists facility_app_state_update on public.facility_app_state;
 
 create policy facility_app_state_read on public.facility_app_state
-for select to anon, authenticated
+for select to authenticated
 using (id = 'main');
 
 create policy facility_app_state_insert on public.facility_app_state
-for insert to anon, authenticated
+for insert to authenticated
 with check (id = 'main');
 
 create policy facility_app_state_update on public.facility_app_state
-for update to anon, authenticated
+for update to authenticated
 using (id = 'main')
 with check (id = 'main');
 
@@ -67,18 +67,18 @@ drop policy if exists facility_attachments_update on storage.objects;
 drop policy if exists facility_attachments_delete on storage.objects;
 
 create policy facility_attachments_read on storage.objects
-for select to anon, authenticated
+for select to authenticated
 using (bucket_id = 'facility-attachments');
 
 create policy facility_attachments_upload on storage.objects
-for insert to anon, authenticated
+for insert to authenticated
 with check (bucket_id = 'facility-attachments');
 
 create policy facility_attachments_update on storage.objects
-for update to anon, authenticated
+for update to authenticated
 using (bucket_id = 'facility-attachments')
 with check (bucket_id = 'facility-attachments');
 
 create policy facility_attachments_delete on storage.objects
-for delete to anon, authenticated
+for delete to authenticated
 using (bucket_id = 'facility-attachments');

@@ -7,6 +7,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '팀장',
     specialty: '시설관리 통합 총괄 및 공사 관리',
     avatar: '👨‍💼',
+    email: 'rhs@dongyang.ac.kr',
   },
   {
     id: 'user_lee',
@@ -14,6 +15,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '과장',
     specialty: '수배전반 정비, 전기안전 전장설비 관리',
     avatar: '⚡',
+    email: 'ihlee84@dongyang.ac.kr',
   },
   {
     id: 'user_park',
@@ -21,6 +23,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '과장',
     specialty: '중앙 공조시스템, 개별 냉난방(GHP) 점검',
     avatar: '❄️',
+    email: 'phc0712@dongyang.ac.kr',
   },
   {
     id: 'user_jang',
@@ -28,6 +31,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '과장',
     specialty: '건축물 영선공사, 바닥/벽체 크랙 충진 및 우수관 방수',
     avatar: '🧱',
+    email: 'msjang82@dongyang.ac.kr',
   },
   {
     id: 'user_park_sh',
@@ -35,6 +39,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '과장',
     specialty: '고가 정밀 계측 기자재 수리 및 전산 자산 실사',
     avatar: '📊',
+    email: 'shpark@dongyang.ac.kr',
   },
   {
     id: 'user_oh',
@@ -42,6 +47,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '반장',
     specialty: '강당 공조팬 보정 및 공용부 기계 설비 점검',
     avatar: '⚙️',
+    email: 'osh@dongyang.ac.kr',
   },
   {
     id: 'user_kim_ih',
@@ -49,6 +55,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '계장',
     specialty: '우수 배출 토널 세정 및 단지 외곽 조경 유지보수',
     avatar: '🌳',
+    email: 'ikh831@dongyang.ac.kr',
   },
   {
     id: 'user_kim_yh',
@@ -56,6 +63,7 @@ export const DEFAULT_USERS: UserProfile[] = [
     role: '계장',
     specialty: '소독 방역 물품 수급, 공용 소모품 공급 및 전산 행정',
     avatar: '📝',
+    email: 'seakim@dongyang.ac.kr',
   },
 ];
 
