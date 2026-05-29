@@ -24,6 +24,7 @@ import { getErrorMessage } from './lib/errors';
 import { getTaskStatusLabel, isApprovalPending } from './lib/taskState';
 import { formatTaskAssigneeLabel, taskIncludesAssignee } from './lib/taskAssignees';
 import { normalizeWorkCategory } from './lib/workCategories';
+import { getSupabaseStateConfig, loadSupabaseState } from './lib/supabaseState';
 import {
   isFacilityModuleSnapshot,
   readFacilityModuleSnapshot,
@@ -329,6 +330,15 @@ export default function App() {
 
     const loadInitialSharedState = async () => {
       try {
+        const supabaseConfig = getSupabaseStateConfig();
+        if (supabaseConfig.enabled) {
+          const result = await loadSupabaseState();
+          if (!cancelled && result.hasState && isFacilityAppState(result.state)) {
+            applyAppSnapshot(result.state);
+          }
+          return;
+        }
+
         const response = await fetch('/api/state', { cache: 'no-store' });
         if (!response.ok) return;
         const result = await response.json();

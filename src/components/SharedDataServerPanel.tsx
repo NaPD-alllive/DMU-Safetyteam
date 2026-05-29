@@ -2,6 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { Copy, Database, Download, RefreshCw, Share2, Smartphone, Upload } from 'lucide-react';
 import { FacilityAppState } from '../types';
 import { getErrorMessage } from '../lib/errors';
+import {
+  getSupabaseStateConfig,
+  getSupabaseStateHealth,
+  loadSupabaseState,
+  saveSupabaseState,
+} from '../lib/supabaseState';
 
 interface SharedDataServerPanelProps {
   createSnapshot: () => FacilityAppState;
@@ -45,6 +51,8 @@ export default function SharedDataServerPanel({
   const [loading, setLoading] = useState(false);
   const [health, setHealth] = useState<ServerHealth | null>(null);
   const [accessInfo, setAccessInfo] = useState<AccessInfo | null>(null);
+  const supabaseConfig = getSupabaseStateConfig();
+  const useSupabase = supabaseConfig.enabled;
 
   const recommendedMobileUrls = accessInfo?.recommendedUrls ?? [];
   const otherMobileUrls = accessInfo?.otherUrls ?? [];
@@ -53,6 +61,13 @@ export default function SharedDataServerPanel({
   const checkServer = async () => {
     setChecking(true);
     try {
+      if (useSupabase) {
+        const data = await getSupabaseStateHealth();
+        setHealth(data);
+        setAvailable(true);
+        return;
+      }
+
       const response = await fetch('/api/health', { cache: 'no-store' });
       if (!response.ok) throw new Error('공유 서버 응답이 없습니다.');
       const data = (await response.json()) as ServerHealth;
@@ -67,6 +82,11 @@ export default function SharedDataServerPanel({
   };
 
   const loadAccessInfo = async () => {
+    if (useSupabase) {
+      setAccessInfo(null);
+      return;
+    }
+
     try {
       const response = await fetch('/api/access-info', { cache: 'no-store' });
       if (!response.ok) throw new Error('access info unavailable');
@@ -110,7 +130,11 @@ export default function SharedDataServerPanel({
 
   const saveToServer = async () => {
     if (!available) {
-      addToast('공유 서버 꺼짐', '팀원 공용 저장소를 쓰려면 start-team-share.cmd로 실행해 주세요.', '🔒');
+      addToast(
+        '공용 저장소 연결 안 됨',
+        useSupabase ? 'Supabase 연결값을 확인해 주세요.' : '팀원 공용 저장소를 쓰려면 start-team-share.cmd로 실행해 주세요.',
+        '🔒',
+      );
       return;
     }
 
@@ -120,6 +144,13 @@ export default function SharedDataServerPanel({
     setSaving(true);
     try {
       const snapshot = createSnapshot();
+      if (useSupabase) {
+        const result = await saveSupabaseState(snapshot);
+        setHealth(result);
+        addToast('Supabase 저장 완료', '현재 운영 데이터를 온라인 공용 저장소에 저장했습니다.', '✅');
+        return;
+      }
+
       const response = await fetch('/api/state', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -146,7 +177,11 @@ export default function SharedDataServerPanel({
 
   const loadFromServer = async () => {
     if (!available) {
-      addToast('공유 서버 꺼짐', '팀원 공용 저장소를 쓰려면 start-team-share.cmd로 실행해 주세요.', '🔒');
+      addToast(
+        '공용 저장소 연결 안 됨',
+        useSupabase ? 'Supabase 연결값을 확인해 주세요.' : '팀원 공용 저장소를 쓰려면 start-team-share.cmd로 실행해 주세요.',
+        '🔒',
+      );
       return;
     }
 
@@ -155,6 +190,27 @@ export default function SharedDataServerPanel({
 
     setLoading(true);
     try {
+      if (useSupabase) {
+        const result = await loadSupabaseState();
+        if (!result.hasState || !result.state) {
+          addToast('공유 데이터 없음', '아직 Supabase 공용 저장소에 저장된 데이터가 없습니다.', 'ℹ️');
+          return;
+        }
+
+        onApplySnapshot(result.state);
+        setHealth((prev) => ({
+          ok: true,
+          mode: 'supabase',
+          savedAt: result.savedAt || prev?.savedAt,
+          taskCount: result.state.tasks?.length || 0,
+          facilityCount: result.state.facilityModule?.facilities?.length || 0,
+          reservationCount: result.state.facilityModule?.reservations?.length || 0,
+          storagePath: prev?.storagePath,
+        }));
+        addToast('Supabase 불러오기 완료', '온라인 공용 저장소의 최신 데이터를 화면에 반영했습니다.', '✅');
+        return;
+      }
+
       const response = await fetch('/api/state', { cache: 'no-store' });
       if (!response.ok) throw new Error('서버 데이터를 불러오지 못했습니다.');
       const result = await response.json();
@@ -188,7 +244,7 @@ export default function SharedDataServerPanel({
         </div>
         <div className="min-w-0">
           <h2 className="text-white font-black text-lg tracking-tight flex items-center gap-2">
-            팀원 공용 저장소
+            {useSupabase ? '온라인 공용 저장소' : '팀원 공용 저장소'}
             {available ? (
               <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs px-2.5 py-1 rounded-lg font-black tracking-widest">
                 연결됨
@@ -201,23 +257,38 @@ export default function SharedDataServerPanel({
           </h2>
           <p className="text-sm text-slate-200 mt-1.5 font-semibold leading-relaxed">
             {available
-              ? `마지막 서버 저장: ${formatSavedAt(health?.savedAt)}`
+              ? `마지막 저장: ${formatSavedAt(health?.savedAt)}`
               : '현재는 이 브라우저에만 저장됩니다. 팀원 공용 데이터는 start-team-share.cmd 실행 시 사용할 수 있습니다.'}
           </p>
           {available && (
             <div className="space-y-1 mt-1.5">
               <p className="text-xs text-slate-400 font-bold">
-                서버 저장: 업무지정 {health?.taskCount ?? 0}건 · 시설 {health?.facilityCount ?? 0}개 · 사용일정 {health?.reservationCount ?? 0}건
+                저장 데이터: 업무지정 {health?.taskCount ?? 0}건 · 시설 {health?.facilityCount ?? 0}개 · 사용일정 {health?.reservationCount ?? 0}건
               </p>
               {health?.storagePath && (
                 <p className="text-xs text-emerald-300 font-bold break-all">
-                  저장 위치: {health.storagePath}
+                  {useSupabase ? 'Supabase 위치' : '저장 위치'}: {health.storagePath}
                 </p>
               )}
             </div>
           )}
 
-          {available && (
+          {available && useSupabase && (
+            <div className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 sm:p-4">
+              <div className="flex items-center gap-2 text-emerald-100">
+                <Smartphone className="w-4 h-4 text-emerald-300" />
+                <span className="text-sm font-black">팀원 접속 주소</span>
+              </div>
+              <p className="mt-1 text-xs text-slate-300 font-semibold leading-relaxed">
+                팀원과 스마트폰에서는 Vercel 주소로 접속합니다. 저장/불러오기 버튼은 Supabase 공용 저장소와 연결됩니다.
+              </p>
+              <code className="mt-3 block break-all rounded-xl border border-slate-700/80 bg-slate-950/80 p-3 text-xs text-emerald-200">
+                {window.location.origin}
+              </code>
+            </div>
+          )}
+
+          {available && !useSupabase && (
             <div className="mt-4 rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-3 sm:p-4">
               <div className="flex items-center gap-2 text-indigo-100">
                 <Smartphone className="w-4 h-4 text-indigo-300" />
@@ -313,7 +384,7 @@ export default function SharedDataServerPanel({
           }`}
         >
           <Upload className="w-4 h-4" />
-          <span>{saving ? '저장 중' : '현재 데이터 서버 저장'}</span>
+          <span>{saving ? '저장 중' : '현재 데이터 공용 저장'}</span>
         </button>
       </div>
     </div>
