@@ -1,0 +1,6 @@
+{
+  "name": "시설관리 업무 관리 시스템",
+  "description": "시설관리팀을 위한 실시간 작업 현황 공유, 사진 첨부 완료 보고, 그리고 업무 분야별(공사, 전기, 냉난방기, 자산 관리, 기자재 유지보수) 협업 애플리케이션",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,13 @@
+node_modules/
+.npm-cache/
+.git-broken*/
+build/
+dist/
+coverage/
+.vercel/
+data/*.json
+.DS_Store
+*.log
+*.lnk
+.env*
+!.env.example

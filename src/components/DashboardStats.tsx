@@ -1,0 +1,224 @@
+import React, { useMemo } from 'react';
+import { BarChart3, Clock, ShieldAlert } from 'lucide-react';
+import type { FacilityUserAccess } from '../facility/types';
+import { isApprovalPending, isCompletionApproved } from '../lib/taskState';
+import { taskIncludesAssignee } from '../lib/taskAssignees';
+import { Task, UserProfile } from '../types';
+
+interface DashboardStatsProps {
+  tasks: Task[];
+  users: UserProfile[];
+  userAccessList: FacilityUserAccess[];
+  currentUserId: string;
+  canManageAdminAccess: boolean;
+  onAdminAccessChange: (userId: string, isAdmin: boolean) => void;
+}
+
+interface StatCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  value: string;
+  caption: string;
+  tone: 'emerald' | 'rose' | 'amber' | 'indigo';
+}
+
+const toneClass = {
+  emerald: {
+    icon: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    value: 'text-emerald-400',
+  },
+  rose: {
+    icon: 'bg-rose-500/10 text-rose-400 border-rose-500/20',
+    value: 'text-rose-400',
+  },
+  amber: {
+    icon: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    value: 'text-amber-400',
+  },
+  indigo: {
+    icon: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    value: 'text-indigo-400',
+  },
+};
+
+const isDelayedTask = (task: Task) => {
+  if (task.status === '완료' || !task.dueDate) return false;
+  return new Date(task.dueDate).getTime() < Date.now();
+};
+
+export default function DashboardStats({
+  tasks,
+  users,
+  userAccessList,
+  currentUserId,
+  canManageAdminAccess,
+  onAdminAccessChange,
+}: DashboardStatsProps) {
+  const accessByUserId = useMemo(() => new Map(userAccessList.map((item) => [item.userId, item])), [userAccessList]);
+  const total = tasks.length;
+  const approved = tasks.filter(isCompletionApproved).length;
+  const approvalPending = tasks.filter(isApprovalPending).length;
+  const inProgress = tasks.filter((task) => task.status === '진행중').length;
+  const pending = tasks.filter((task) => task.status === '대기중').length;
+  const urgent = tasks.filter((task) => task.priority === '긴급' && task.status !== '완료').length;
+  const completionRate = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const adminCount = users.filter((user) => accessByUserId.get(user.id)?.role === 'admin').length;
+
+  const getUserTaskCount = (userName: string, status?: '대기중' | '진행중' | '완료') =>
+    tasks.filter((task) => {
+      const matchesUser = taskIncludesAssignee(task.assignee, userName);
+      return status ? matchesUser && task.status === status : matchesUser;
+    }).length;
+
+  const getUserDelayedTaskCount = (userName: string) =>
+    tasks.filter((task) => taskIncludesAssignee(task.assignee, userName) && isDelayedTask(task)).length;
+
+  return (
+    <div className="space-y-3 mb-4" id="dashboard-stats-container">
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+        <CompletionCard
+          approved={approved}
+          approvalPending={approvalPending}
+          completionRate={completionRate}
+          total={total}
+        />
+        <StatCard
+          icon={ShieldAlert}
+          label="미완료 긴급 업무"
+          value={`${urgent}건`}
+          caption="우선 조치"
+          tone="rose"
+        />
+        <StatCard
+          icon={Clock}
+          label="현장 조치 진행중"
+          value={`${inProgress}건`}
+          caption="실시간 배정"
+          tone="amber"
+        />
+        <StatCard
+          icon={BarChart3}
+          label="조치 대기"
+          value={`${pending}건`}
+          caption="신규 오더"
+          tone="indigo"
+        />
+      </section>
+
+      <section className="bg-slate-900/75 backdrop-blur-md p-5 rounded-3xl border border-slate-700/80 shadow-xl">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <h4 className="text-white text-lg font-black tracking-tight">
+            시설관리팀 현황
+          </h4>
+          <span className="text-xs font-black text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 rounded-xl shrink-0">
+            {users.length}명 / 관리자 {adminCount}명
+          </span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {users.map((user) => {
+            const access = accessByUserId.get(user.id);
+            const isAdmin = access?.role === 'admin';
+            const activeCount = getUserTaskCount(user.name, '진행중');
+            const completedCount = getUserTaskCount(user.name, '완료');
+            const delayedCount = getUserDelayedTaskCount(user.name);
+
+            return (
+              <div
+                key={user.id}
+                className="rounded-2xl border border-slate-700/80 bg-slate-950/90 p-4 shadow-inner"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-2xl shrink-0">{user.avatar}</span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-base text-white font-black truncate">{user.name}</span>
+                        <span className="text-xs text-slate-300 font-black shrink-0">{user.role}</span>
+                      </div>
+                      <label className="mt-1.5 flex items-center gap-1.5 text-xs text-slate-300 font-black">
+                        <input
+                          type="checkbox"
+                          checked={isAdmin}
+                          disabled={!canManageAdminAccess || user.id === currentUserId}
+                          onChange={(event) => onAdminAccessChange(user.id, event.target.checked)}
+                          className="w-4 h-4 accent-indigo-500 disabled:opacity-40"
+                        />
+                        관리자
+                      </label>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 mt-4 font-mono text-xs">
+                  <span className="px-2 py-2 bg-amber-500/15 text-amber-200 rounded-xl font-black text-center border border-amber-500/20">작업중 {activeCount}</span>
+                  <span className="px-2 py-2 bg-emerald-500/15 text-emerald-200 rounded-xl font-black text-center border border-emerald-500/20">완료 {completedCount}</span>
+                  <span className="px-2 py-2 bg-rose-500/15 text-rose-200 rounded-xl font-black text-center border border-rose-500/20">지연 {delayedCount}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+    </div>
+  );
+}
+
+function CompletionCard({
+  approved,
+  approvalPending,
+  completionRate,
+  total,
+}: {
+  approved: number;
+  approvalPending: number;
+  completionRate: number;
+  total: number;
+}) {
+  return (
+    <div className="bg-slate-900/75 backdrop-blur-md p-5 rounded-3xl border border-slate-700/80 shadow-xl flex items-center justify-between min-h-[118px]">
+      <div>
+        <span className="text-xs uppercase font-black tracking-widest text-slate-300 block mb-1">전체 업무 완료율</span>
+        <h3 className="text-4xl font-black text-white font-mono tracking-tight">{completionRate}%</h3>
+        <p className="text-sm text-slate-300 mt-1.5 leading-relaxed">
+          총 {total}건 중 <span className="font-extrabold text-emerald-300">{approved}건 승인완료</span>
+          {approvalPending > 0 && <span className="font-extrabold text-amber-300"> / {approvalPending}건 승인대기</span>}
+        </p>
+      </div>
+      <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
+        <svg className="w-full h-full transform -rotate-90" aria-hidden="true">
+          <circle cx="28" cy="28" r="22" className="stroke-slate-800" strokeWidth="5" fill="transparent" />
+          <circle
+            cx="28"
+            cy="28"
+            r="22"
+            className="stroke-emerald-400 transition-all duration-500 ease-out"
+            strokeWidth="5"
+            fill="transparent"
+            strokeDasharray={2 * Math.PI * 22}
+            strokeDashoffset={2 * Math.PI * 22 * (1 - completionRate / 100)}
+          />
+        </svg>
+        <div className="absolute text-white font-black text-[10px] font-mono">
+          {approved}/{total}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, caption, tone }: StatCardProps) {
+  const classes = toneClass[tone];
+
+  return (
+    <div className="bg-slate-900/75 backdrop-blur-md p-5 rounded-3xl border border-slate-700/80 shadow-xl flex items-center gap-4 min-h-[118px]">
+      <div className={`p-3.5 rounded-2xl border ${classes.icon}`}>
+        <Icon className="w-6 h-6" />
+      </div>
+      <div className="min-w-0">
+        <span className="text-xs uppercase font-black tracking-widest text-slate-300 block leading-tight">{label}</span>
+        <h3 className={`text-4xl font-black font-mono tracking-tight mt-1 ${classes.value}`}>{value}</h3>
+        <span className="text-xs text-slate-300 font-black uppercase tracking-wider">{caption}</span>
+      </div>
+    </div>
+  );
+}
