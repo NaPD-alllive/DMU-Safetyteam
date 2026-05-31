@@ -39,7 +39,7 @@ export default function ReservationListPanel({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `시설사용일정_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.download = `대관일정_${new Date().toISOString().slice(0, 10)}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -51,7 +51,7 @@ export default function ReservationListPanel({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h3 className="text-white font-black text-sm flex items-center gap-2">
           <CalendarClock className="w-4 h-4 text-indigo-400" />
-          시설 사용일정 현황
+          대관 일정 현황
         </h3>
         {isAdmin && (
           <button
@@ -67,7 +67,7 @@ export default function ReservationListPanel({
       </div>
       {reservations.length === 0 ? (
         <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-slate-500 text-xs font-bold">
-          등록된 시설 사용일정이 없습니다.
+          등록된 대관 일정이 없습니다.
         </div>
       ) : (
         <div className="space-y-3">
@@ -85,6 +85,7 @@ export default function ReservationListPanel({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-slate-400 font-bold">
                 <span>{formatReservationDateTime(reservation.startAt)}</span>
                 <span>{formatReservationDateTime(reservation.endAt)}</span>
+                <span>대관요청기관: {reservation.requesterOrganization || '-'}</span>
                 <span>등록자: {reservation.requesterName}</span>
               </div>
               <ReservationActions
@@ -157,7 +158,7 @@ function ReservationStatusSelect({ reservation, onStatusChange }: ReservationSta
       className="px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-200 text-[11px] font-black outline-none"
     >
       <option value="pending">확인필요</option>
-      <option value="approved">사용확정</option>
+      <option value="approved">대관확정</option>
       <option value="rejected">보류</option>
       <option value="cancelled">취소</option>
     </select>

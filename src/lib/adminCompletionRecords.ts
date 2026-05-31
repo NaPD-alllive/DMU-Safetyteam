@@ -58,7 +58,11 @@ export const buildCompletedWorkRecords = (snapshot: FacilityAppState): Completed
       completedAt: log.eveningSubmittedAt || `${log.date}T23:59:59`,
       title: `${log.employeeName} 근무일지`,
       owner: log.employeeName,
-      detail: [`오늘 할 일: ${log.morningPlan || '-'}`, `결과: ${log.eveningResult}`].join('\n'),
+      detail: [
+        `오늘 할 일: ${log.morningPlan || '-'}`,
+        `결과: ${log.eveningResult}`,
+        log.remarks ? `비고: ${log.remarks}` : '',
+      ].filter(Boolean).join('\n'),
     }));
 
   return [...taskRecords, ...dailyLogRecords].sort(

@@ -55,6 +55,7 @@ const snapshot: FacilityAppState = {
       morningPlan: '점검',
       morningSubmittedAt: '2026-05-27T00:30:00.000Z',
       eveningResult: '점검 완료',
+      remarks: '개선사항: 점검표 양식 보완 필요',
       eveningStatus: '완료',
       eveningSubmittedAt: '2026-05-27T08:30:00.000Z',
       managerFeedbackList: [],
@@ -81,6 +82,7 @@ const records = buildCompletedWorkRecords(snapshot);
 
 assert(records.length === 2, 'only completed task and completed daily log should be included');
 assert(records.some((record) => record.workType === '안전관리'), 'daily log work type should be used as 업무구분');
+assert(records.some((record) => record.detail.includes('비고: 개선사항')), 'daily log remarks should be included');
 assert(!records.some((record) => record.title.includes('대기 업무')), 'open task should be excluded');
 
 const csv = buildCompletedWorkCsv(records);

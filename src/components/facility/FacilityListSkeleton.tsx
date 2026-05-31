@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function FacilityListSkeleton() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="시설 목록을 불러오는 중">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4" aria-label="대관 시설 목록을 불러오는 중">
       {Array.from({ length: 4 }).map((_, index) => (
         <div key={index} className="rounded-3xl border border-slate-800 bg-slate-900/40 p-5 animate-pulse">
           <div className="h-36 rounded-2xl bg-slate-800/70 mb-4" />

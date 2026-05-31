@@ -56,6 +56,7 @@ export interface FacilityReservation {
   requesterId: string;
   requesterName: string;
   requesterRole: FacilityRole;
+  requesterOrganization?: string;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -67,6 +68,7 @@ export interface FacilityReservation {
 
 export interface ReservationFormValues {
   facilityId: string;
+  requesterOrganization: string;
   purpose: string;
   startAt: string;
   endAt: string;
@@ -74,6 +76,7 @@ export interface ReservationFormValues {
 
 export interface ReservationValidationErrors {
   facilityId?: string;
+  requesterOrganization?: string;
   purpose?: string;
   startAt?: string;
   endAt?: string;

@@ -83,7 +83,7 @@ export default function FacilityFormPanel({
   return (
     <form onSubmit={submit} className="bg-slate-900/60 border border-slate-800 rounded-3xl p-5 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-white font-black text-sm">{editingFacility ? '시설 수정' : '시설 등록'}</h3>
+        <h3 className="text-white font-black text-sm">{editingFacility ? '대관 시설 수정' : '대관 시설 등록'}</h3>
         {editingFacility && (
           <button type="button" onClick={onCancelEdit} className="p-1.5 rounded-lg text-slate-500 hover:text-white">
             <X className="w-4 h-4" />
@@ -147,7 +147,7 @@ export default function FacilityFormPanel({
       </div>
       <button type="submit" className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-black flex items-center justify-center gap-2">
         <Save className="w-4 h-4" />
-        {editingFacility ? '시설 수정 저장' : '시설 등록'}
+        {editingFacility ? '대관 시설 수정 저장' : '대관 시설 등록'}
       </button>
     </form>
   );

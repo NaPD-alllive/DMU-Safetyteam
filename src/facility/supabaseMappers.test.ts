@@ -64,6 +64,7 @@ const reservationRow: SupabaseReservationRow = {
   id: 'reservation_1',
   facility_id: 'facility_1',
   requester_id: 'profile_2',
+  requester_organization: '건축학과',
   purpose: '수업',
   start_at: '2026-05-28T09:00:00Z',
   end_at: '2026-05-28T10:00:00Z',
@@ -117,6 +118,7 @@ assert(mapFacilityRow(facilityRow).imageUrl === undefined, 'null image should be
 assert(mapAssetRow(assetRow, facilityRow.name).facilityName === facilityRow.name, 'asset facility name should map');
 assert(mapAssetRow(assetRow, facilityRow.name).assetTag === assetRow.asset_tag, 'asset tag should map');
 assert(mapReservationRow(reservationRow, facilityRow.name, '박성훈', 'staff').requesterRole === 'staff', 'reservation requester role should map');
+assert(mapReservationRow(reservationRow, facilityRow.name, '박성훈', 'staff').requesterOrganization === '건축학과', 'reservation organization should map');
 assert(mapMaintenanceRow(maintenanceRow, facilityRow.name, '박성훈', 'staff').photoUrl === undefined, 'null maintenance photo should become undefined');
 assert(mapInspectionRow(inspectionRow, facilityRow.name).inspectionType === '전기', 'inspection type should map');
 assert(mapNotificationRow(notificationRow, '박성훈').recipientName === '박성훈', 'notification recipient name should map');

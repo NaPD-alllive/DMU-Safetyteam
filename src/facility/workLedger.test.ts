@@ -33,6 +33,7 @@ const dailyLogs: DailyLog[] = [
     morningPlan: '전기 기계동 전력 제어반 3호 릴레이 점검',
     morningSubmittedAt: '2026-05-23T08:10:00Z',
     eveningResult: '릴레이 2개 교체 완료 및 전압 확인',
+    remarks: '검토사항: 예비 릴레이 재고 보충 필요',
     eveningStatus: '완료',
     eveningSubmittedAt: '2026-05-23T17:40:00Z',
     managerFeedbackList: [
@@ -56,6 +57,7 @@ assert(entries.length === 2, 'ledger should include task and self-managed work l
 assert(entries.some((entry) => entry.source === '업무지정'), 'task should create assignment entry');
 assert(entries.some((entry) => entry.source === 'Self-Managed Work Logs'), 'daily log should create self-managed entry');
 assert(entries.some((entry) => entry.description.includes('오늘 할 일')), 'daily log entry should summarize to-do text');
+assert(entries.some((entry) => entry.description.includes('비고: 검토사항')), 'daily log entry should include remarks');
 assert(entries.some((entry) => entry.description.includes('팀장 피드백')), 'daily log entry should include manager feedback');
 
 const csv = buildWorkLedgerCsv(entries);

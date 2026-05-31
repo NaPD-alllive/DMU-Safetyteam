@@ -10,6 +10,7 @@ const now = new Date('2026-05-27T00:00:00');
 const facility = DEFAULT_FACILITIES[0];
 const baseForm: ReservationFormValues = {
   facilityId: facility.id,
+  requesterOrganization: '총학생회',
   purpose: '수업 운영',
   startAt: '2026-05-28T09:00',
   endAt: '2026-05-28T10:00',
@@ -22,6 +23,7 @@ const activeReservation: FacilityReservation = {
   requesterId: 'user_1',
   requesterName: '신청자',
   requesterRole: 'staff',
+  requesterOrganization: '건축학과',
   purpose: '기존 예약',
   startAt: '2026-05-28T09:30',
   endAt: '2026-05-28T10:30',

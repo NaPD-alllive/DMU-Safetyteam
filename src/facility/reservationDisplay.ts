@@ -2,7 +2,7 @@ import type { ReservationStatus } from './types';
 
 export const RESERVATION_STATUS_LABEL: Record<ReservationStatus, string> = {
   pending: '확인필요',
-  approved: '사용확정',
+  approved: '대관확정',
   rejected: '보류',
   cancelled: '취소',
 };

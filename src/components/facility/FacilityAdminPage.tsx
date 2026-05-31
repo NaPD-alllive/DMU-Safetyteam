@@ -186,13 +186,13 @@ export default function FacilityAdminPage({
     },
     {
       id: 'facilities',
-      title: '시설 목록/등록',
+      title: '대관 시설 목록/ 등록',
       meta: `${store.filtered.length}개 시설`,
       icon: Building2,
     },
     {
       id: 'usage',
-      title: '사용일정',
+      title: '대관 일정',
       meta: `${reservations.visibleReservations.length}건`,
       icon: ClipboardList,
     },
@@ -206,12 +206,12 @@ export default function FacilityAdminPage({
   const saveForm = (values: FacilityFormValues) => {
     if (editing) {
       store.saveFacility(editing.id, values);
-      addToast('시설 수정 완료', `${values.name} 시설 정보를 수정했습니다.`, '🏢');
+      addToast('대관 시설 수정 완료', `${values.name} 시설 정보를 수정했습니다.`, '🏢');
       setEditing(null);
       return;
     }
     store.addFacility(values);
-    addToast('시설 등록 완료', `${values.name} 시설을 등록했습니다.`, '🏢');
+    addToast('대관 시설 등록 완료', `${values.name} 시설을 등록했습니다.`, '🏢');
   };
 
   const startFacilityEdit = (facility: Facility) => {
@@ -228,12 +228,12 @@ export default function FacilityAdminPage({
     if (!target || !window.confirm(`${target.name} 시설을 삭제하시겠습니까?`)) return;
     store.deleteFacility(id);
     if (selected?.id === id) setSelected(null);
-    addToast('시설 삭제 완료', `${target.name} 시설을 삭제했습니다.`, '🗑️');
+    addToast('대관 시설 삭제 완료', `${target.name} 시설을 삭제했습니다.`, '🗑️');
   };
 
   const saveUsageSchedule = (values: ReservationFormValues) => {
     if (!canRegisterUsageSchedule) {
-      addToast('사용일정 등록 권한 없음', '시설 사용일정은 시설관리팀 관리자만 등록할 수 있습니다.', '⚠️');
+      addToast('대관 일정 등록 권한 없음', '대관 일정은 시설관리팀 관리자만 등록할 수 있습니다.', '⚠️');
       return;
     }
 
@@ -246,26 +246,30 @@ export default function FacilityAdminPage({
     );
     const facility = store.facilities.find((item) => item.id === values.facilityId);
     if (hasReservationErrors(errors) || !facility) {
-      addToast('사용일정 등록 실패', errors.overlap || errors.startAt || errors.facilityId || '사용일정 정보를 확인하세요.', '⚠️');
+      addToast(
+        '대관 일정 등록 실패',
+        errors.overlap || errors.startAt || errors.facilityId || errors.requesterOrganization || errors.purpose || '대관 일정 정보를 확인하세요.',
+        '⚠️',
+      );
       return;
     }
 
     if (editingReservation) {
       reservations.saveReservation(editingReservation.id, values, facility);
-      addToast('사용일정 수정 완료', `${facility.name} 사용일정 정보를 수정했습니다.`, '📅');
+      addToast('대관 일정 수정 완료', `${facility.name} 대관 일정 정보를 수정했습니다.`, '📅');
       setEditingReservation(null);
       return;
     }
 
     reservations.addReservation(values, facility);
-    addToast('사용일정 등록 완료', `${facility.name} 사용일정이 시설관리팀 일정으로 등록되었습니다.`, '📅');
+    addToast('대관 일정 등록 완료', `${facility.name} 대관 일정이 등록되었습니다.`, '📅');
   };
 
   const changeReservationStatus = (id: string, status: ReservationStatus, reason?: string) => {
     if (!canRegisterUsageSchedule) return;
     reservations.changeStatus(id, status, reason);
     if (editingReservation?.id === id && status === 'cancelled') setEditingReservation(null);
-    addToast('사용일정 상태 변경', `사용일정 상태를 ${status} 상태로 변경했습니다.`, '📅');
+    addToast('대관 일정 상태 변경', `대관 일정 상태를 ${status} 상태로 변경했습니다.`, '📅');
   };
 
   const completeInspection = (id: string) => {
@@ -301,7 +305,7 @@ export default function FacilityAdminPage({
             시설 관리 MVP
           </h2>
           <p className="text-xs text-slate-400 mt-1 font-semibold">
-            시설 등록, 검색, 상세 조회, 수정, 삭제를 한 화면에서 관리합니다.
+            대관 시설 등록, 검색, 상세 조회, 수정, 삭제와 대관 일정을 한 화면에서 관리합니다.
           </p>
         </div>
         <div className="px-3.5 py-2 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-black flex items-center gap-2 w-max">
@@ -386,7 +390,7 @@ export default function FacilityAdminPage({
             className="w-full flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/40 transition-colors"
           >
             <div>
-              <h3 className="text-white text-sm font-black">시설 목록</h3>
+              <h3 className="text-white text-sm font-black">대관 시설 목록</h3>
               <p className="text-[10px] text-slate-500 font-bold mt-0.5">
                 {store.filtered.length}개 시설 · 목록 관리
               </p>
@@ -468,9 +472,9 @@ export default function FacilityAdminPage({
               className="w-full flex items-center justify-between gap-3 rounded-2xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/40 transition-colors"
             >
               <div>
-                <h3 className="text-white text-sm font-black">{editing ? '시설 수정' : '시설 등록'}</h3>
+                <h3 className="text-white text-sm font-black">{editing ? '대관 시설 수정' : '대관 시설 등록'}</h3>
                 <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-                  시설 정보 입력
+                  대관 시설 정보 입력
                 </p>
               </div>
               <ChevronDown className={`w-4 h-4 text-indigo-300 transition-transform ${isFacilityFormOpen ? 'rotate-180' : ''}`} />
@@ -481,7 +485,7 @@ export default function FacilityAdminPage({
                 <FacilityFormPanel editingFacility={editing} onSubmit={saveForm} onCancelEdit={() => setEditing(null)} />
               ) : (
                 <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 text-xs text-slate-400 font-bold">
-                  시설 등록, 수정, 삭제는 관리자 권한에서만 가능합니다.
+                  대관 시설 등록, 수정, 삭제는 관리자 권한에서만 가능합니다.
                 </div>
               )
             )}
@@ -504,7 +508,7 @@ export default function FacilityAdminPage({
             />
           ) : (
             <div className="bg-slate-900/40 border border-slate-800 rounded-3xl p-5 text-xs text-slate-400 font-bold leading-relaxed">
-              시설 사용일정 등록은 시설관리팀 관리자 권한에서만 가능합니다. 별도 신청 프로그램에서 확정된 내용은 관리자 화면에서 입력합니다.
+              대관 일정 등록은 시설관리팀 관리자 권한에서만 가능합니다. 별도 신청 프로그램에서 확정된 내용은 관리자 화면에서 입력합니다.
             </div>
           )}
         </div>

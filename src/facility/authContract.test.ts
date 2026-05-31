@@ -40,8 +40,8 @@ assert(getSessionRole(inactiveSession) === 'user', 'inactive session should fall
 
 assert(canManageFacilities('admin'), 'admin should manage facilities');
 assert(canManageReservations('admin'), 'admin should manage reservations');
-assert(!canManageReservations('staff'), 'staff should not register facility usage schedules');
-assert(!canManageReservations('user'), 'student users should not register facility usage schedules');
+assert(!canManageReservations('staff'), 'staff should not register rental schedules');
+assert(!canManageReservations('user'), 'student users should not register rental schedules');
 assert(canManageMaintenance('admin'), 'admin should manage maintenance');
 assert(canManageUserAccess('admin'), 'admin should manage users');
 assert(canManageInspections('admin'), 'admin should manage inspections');

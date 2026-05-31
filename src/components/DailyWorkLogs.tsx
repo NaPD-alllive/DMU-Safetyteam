@@ -67,11 +67,12 @@ export default function DailyWorkLogs({
   const [workType, setWorkType] = useState<DailyLogWorkType>(DEFAULT_DAILY_LOG_WORK_TYPE);
   const [morningText, setMorningText] = useState('');
   const [resultTexts, setResultTexts] = useState<Record<string, string>>({});
+  const [remarkTexts, setRemarkTexts] = useState<Record<string, string>>({});
   const [statusTexts, setStatusTexts] = useState<Record<string, DailyLogStatus>>({});
   const [feedbackTexts, setFeedbackTexts] = useState<Record<string, string>>({});
 
   const isManager = currentUser.role === '팀장';
-  const staffMembers = users.filter((user) => user.role !== '팀장');
+  const teamMembers = users;
   const filteredLogs = useMemo(
     () => sortLogs(dailyLogs.filter((log) => log.date === selectedDate)),
     [dailyLogs, selectedDate],
@@ -104,6 +105,7 @@ export default function DailyWorkLogs({
 
   const saveResult = (log: DailyLog) => {
     const result = (resultTexts[log.id] ?? log.eveningResult).trim();
+    const remarks = (remarkTexts[log.id] ?? log.remarks ?? '').trim();
     if (!result) {
       addToast('결과 입력 필요', '결과 내용을 입력한 뒤 저장해 주세요.', '⚠️');
       return;
@@ -118,6 +120,7 @@ export default function DailyWorkLogs({
           ? {
               ...item,
               eveningResult: result,
+              remarks,
               eveningStatus: status,
               eveningSubmittedAt: timestamp,
             }
@@ -126,6 +129,11 @@ export default function DailyWorkLogs({
     );
 
     setResultTexts((prev) => {
+      const next = { ...prev };
+      delete next[log.id];
+      return next;
+    });
+    setRemarkTexts((prev) => {
       const next = { ...prev };
       delete next[log.id];
       return next;
@@ -167,6 +175,7 @@ export default function DailyWorkLogs({
 
   const renderLogSummary = (log: DailyLog, allowResultEdit: boolean, allowFeedback: boolean) => {
     const resultValue = resultTexts[log.id] ?? log.eveningResult;
+    const remarkValue = remarkTexts[log.id] ?? log.remarks ?? '';
     const statusValue = statusTexts[log.id] || log.eveningStatus;
 
     return (
@@ -196,6 +205,13 @@ export default function DailyWorkLogs({
           </div>
         )}
 
+        {log.remarks && !allowResultEdit && (
+          <div className="rounded-xl bg-slate-950/70 border border-slate-800 p-3">
+            <p className="text-[11px] text-amber-300 font-semibold mb-1">비고</p>
+            <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-line">{log.remarks}</p>
+          </div>
+        )}
+
         {allowResultEdit && (
           <div className="space-y-3">
             <textarea
@@ -205,6 +221,16 @@ export default function DailyWorkLogs({
               placeholder="업무 결과를 입력하세요."
               className="w-full px-3.5 py-3 rounded-xl border border-slate-800 bg-slate-950 text-sm focus:ring-2 focus:ring-emerald-500/25 focus:border-emerald-400 outline-none text-white font-medium placeholder:text-slate-600"
             />
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-400 block">비고</label>
+              <textarea
+                rows={2}
+                value={remarkValue}
+                onChange={(event) => setRemarkTexts((prev) => ({ ...prev, [log.id]: event.target.value }))}
+                placeholder="유의사항, 개선사항, 검토사항, 건의사항 등을 입력하세요."
+                className="w-full px-3.5 py-3 rounded-xl border border-slate-800 bg-slate-950 text-sm focus:ring-2 focus:ring-amber-500/25 focus:border-amber-400 outline-none text-white font-medium placeholder:text-slate-600"
+              />
+            </div>
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div className="flex items-center gap-1.5 bg-slate-950 p-1 border border-slate-800 rounded-xl">
                 {(['대기중', '진행중', '완료'] as const).map((status) => (
@@ -329,9 +355,8 @@ export default function DailyWorkLogs({
         </div>
       </div>
 
-      {!isManager && (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
-          <section className="xl:col-span-4 bg-slate-900/60 backdrop-blur-md rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
+        <section className="xl:col-span-4 bg-slate-900/60 backdrop-blur-md rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <span className="text-sm font-semibold text-indigo-200 flex items-center gap-2">
                 <Coffee className="w-4 h-4 text-amber-400" />
@@ -380,9 +405,9 @@ export default function DailyWorkLogs({
                 업무 항목 추가
               </button>
             </form>
-          </section>
+        </section>
 
-          <section className="xl:col-span-8 bg-slate-900/60 backdrop-blur-md rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
+        <section className="xl:col-span-8 bg-slate-900/60 backdrop-blur-md rounded-3xl p-5 border border-slate-800 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-slate-800/80 pb-3">
               <span className="text-sm font-semibold text-emerald-200 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-emerald-400" />
@@ -403,9 +428,8 @@ export default function DailyWorkLogs({
                 {currentUserLogs.map((log) => renderLogSummary(log, true, false))}
               </div>
             )}
-          </section>
-        </div>
-      )}
+        </section>
+      </div>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -417,7 +441,7 @@ export default function DailyWorkLogs({
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          {staffMembers.map((staff) => {
+          {teamMembers.map((staff) => {
             const staffLogs = filteredLogs.filter((log) => log.employeeId === staff.id);
             const completedCount = staffLogs.filter((log) => log.eveningStatus === '완료').length;
 
@@ -469,11 +493,11 @@ export default function DailyWorkLogs({
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {staffLogs.map((log) => renderLogSummary(log, false, isManager))}
+                    {staffLogs.map((log) => renderLogSummary(log, false, isManager && staff.id !== currentUser.id))}
                   </div>
                 )}
 
-                {!isManager && staff.id === currentUser.id && staffLogs.length > 0 && (
+                {staff.id === currentUser.id && staffLogs.length > 0 && (
                   <div className="bg-indigo-950/15 border border-indigo-500/20 p-3 rounded-xl flex items-start gap-2.5">
                     <User className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
                     <span className="text-xs text-indigo-200 font-medium leading-relaxed">

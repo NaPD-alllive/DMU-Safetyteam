@@ -115,7 +115,7 @@ export default function TaskDetailModal({
     setCompletionPhoto(undefined);
   };
 
-  const technicians = allUsers.filter((u) => u.role !== '팀장');
+  const assignableUsers = allUsers;
 
   return (
     <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -471,7 +471,7 @@ export default function TaskDetailModal({
                           onChange={(e) => onManagerAction(task.id, 'change_assignee', e.target.value)}
                           className="w-full p-2 bg-slate-950 text-white border border-slate-800 rounded-lg outline-none font-bold"
                         >
-                          {technicians.map((t) => (
+                          {assignableUsers.map((t) => (
                             <option key={t.name} value={t.name} className="bg-slate-900">{t.name}</option>
                           ))}
                         </select>

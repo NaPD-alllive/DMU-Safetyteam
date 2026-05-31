@@ -62,6 +62,7 @@ create table public.facility_reservations (
   id uuid primary key default gen_random_uuid(),
   facility_id uuid not null references public.facilities(id) on delete cascade,
   requester_id uuid not null references public.profiles(id) on delete cascade,
+  requester_organization text not null default '',
   purpose text not null,
   start_at timestamptz not null,
   end_at timestamptz not null,

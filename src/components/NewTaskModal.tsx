@@ -108,7 +108,7 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
     onClose();
   };
 
-  const technicians = users.filter((u) => u.name !== '나형석'); // Filter out manager
+  const assignableUsers = users;
   const toggleAssignee = (name: string) => {
     setSelectedAssignees((prev) => {
       const next = prev.includes(name)
@@ -241,7 +241,7 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
               </span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {technicians.map((u) => {
+              {assignableUsers.map((u) => {
                 const selected = selectedAssignees.includes(u.name);
 
                 return (

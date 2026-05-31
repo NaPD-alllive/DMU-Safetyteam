@@ -34,6 +34,7 @@ export interface DailyLog {
   morningPlan: string; // 출근 보고: 오늘 할 일
   morningSubmittedAt?: string;
   eveningResult: string; // 퇴근 보고: 완성, 완료 결과 등 진행 상황
+  remarks?: string; // 비고: 유의사항, 개선사항, 검토사항, 건의사항
   eveningStatus: '대기중' | '진행중' | '완료';
   eveningSubmittedAt?: string;
   managerFeedbackList: DailyLogComment[]; // 팀장이 남기는 피드백 멘트 및 지시사항

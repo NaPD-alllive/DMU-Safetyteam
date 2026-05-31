@@ -63,6 +63,7 @@ export interface SupabaseReservationRow {
   id: string;
   facility_id: string;
   requester_id: string;
+  requester_organization?: string | null;
   purpose: string;
   start_at: string;
   end_at: string;
@@ -161,6 +162,7 @@ export const mapReservationRow = (
   requesterId: row.requester_id,
   requesterName,
   requesterRole,
+  requesterOrganization: row.requester_organization || '',
   purpose: row.purpose,
   startAt: row.start_at,
   endAt: row.end_at,
