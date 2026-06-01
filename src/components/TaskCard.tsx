@@ -8,6 +8,7 @@ interface TaskCardProps {
   key?: React.Key;
   task: Task;
   onSelect: (task: Task) => void;
+  onAssigneeAction?: (task: Task) => void;
   currentUserSpecialty?: string;
   isSynced?: boolean;
   isCurrentUserAssignee?: boolean;
@@ -19,7 +20,7 @@ const PRIORITY_STYLES = {
   '낮음': { bg: 'bg-slate-800 text-slate-400 border border-slate-700 font-bold uppercase tracking-wider', icon: null },
 };
 
-export default function TaskCard({ task, onSelect, isSynced, isCurrentUserAssignee = false }: TaskCardProps) {
+export default function TaskCard({ task, onSelect, onAssigneeAction, isSynced, isCurrentUserAssignee = false }: TaskCardProps) {
   const priorityStyle = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['보통'];
   const statusLabel = getTaskStatusLabel(task);
   const assigneeNames = splitTaskAssignees(task.assignee);
@@ -79,12 +80,16 @@ export default function TaskCard({ task, onSelect, isSynced, isCurrentUserAssign
           type="button"
           onClick={(event) => {
             event.stopPropagation();
+            if (onAssigneeAction) {
+              onAssigneeAction(task);
+              return;
+            }
             onSelect(task);
           }}
           className="mb-4 w-full rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm font-black text-emerald-100 hover:bg-emerald-500/25 hover:border-emerald-300 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/5"
         >
           <CheckSquare className="w-4 h-4 text-emerald-300" />
-          <span>{task.status === '대기중' ? '업무 확인 / 조치 입력' : '조치 내용 입력 / 보고'}</span>
+          <span>{task.status === '대기중' ? '업무 접수 / 조치 입력' : '조치 내용 입력 / 보고'}</span>
         </button>
       )}
 

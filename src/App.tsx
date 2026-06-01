@@ -800,6 +800,22 @@ export default function App() {
     );
   };
 
+  const handleAssigneeTaskAction = (task: Task) => {
+    setActiveTab('tasks');
+    setSelectedStatus('전체');
+    setSearchQuery('');
+    setShowMyTasksOnly(true);
+    setViewMode('grid');
+
+    if (task.status === '대기중') {
+      handleUpdateStatus(task.id, '진행중');
+      setSelectedTask({ ...task, status: '진행중' });
+      return;
+    }
+
+    setSelectedTask(task);
+  };
+
   // Submit Completion Report (기사 -> 완료보고 사진+글)
   const handleSubmitCompletion = (taskId: string, report: string, photoUrl?: string) => {
     const timestamp = new Date().toISOString();
@@ -1618,6 +1634,7 @@ export default function App() {
                 key={task.id} 
                 task={task} 
                 onSelect={(t) => setSelectedTask(t)} 
+                onAssigneeAction={handleAssigneeTaskAction}
                 isSynced={syncedTaskIds.includes(task.id)}
                 isCurrentUserAssignee={currentUser.role !== '팀장' && taskIncludesAssignee(task.assignee, currentUser.name)}
               />
