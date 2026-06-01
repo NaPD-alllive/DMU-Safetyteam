@@ -27,7 +27,7 @@ import { formatTaskAssigneeLabel, taskIncludesAssignee } from './lib/taskAssigne
 import { normalizeWorkCategory } from './lib/workCategories';
 import { clearStoredSupabaseAuthSession } from './lib/supabaseAuth';
 import { isPrimaryAdminUser } from './lib/teamMembers';
-import { getSupabaseStateConfig, loadSupabaseState } from './lib/supabaseState';
+import { getSupabaseStateConfig, loadSupabaseState, saveSupabaseState } from './lib/supabaseState';
 import {
   isFacilityModuleSnapshot,
   readFacilityModuleSnapshot,
@@ -551,8 +551,6 @@ export default function App() {
       ]
     };
 
-    setTasks((prev) => [newTask, ...prev]);
-
     // Add Notification
     const newNotification: TeamNotification = {
       id: `notif_${Date.now()}`,
@@ -565,7 +563,16 @@ export default function App() {
       timestamp,
       read: false,
     };
-    setNotifications((prev) => [newNotification, ...prev]);
+    const nextTasks = [newTask, ...tasks];
+    const nextNotifications = [newNotification, ...notifications];
+
+    setTasks(nextTasks);
+    setNotifications(nextNotifications);
+    setActiveTab('tasks');
+    setSelectedStatus('전체');
+    setSearchQuery('');
+    setShowMyTasksOnly(false);
+    setViewMode('grid');
 
     addToast(
       '업무지정 등록 완료',
@@ -573,6 +580,27 @@ export default function App() {
       '📋',
       data.priority === '긴급' ? 'urgent' : 'normal'
     );
+
+    if (supabaseStateConfig.enabled) {
+      const snapshotToSave: FacilityAppState = {
+        ...createAppSnapshot(),
+        exportedAt: new Date().toISOString(),
+        tasks: nextTasks,
+        notifications: nextNotifications,
+      };
+
+      void saveSupabaseState(snapshotToSave, authenticatedEmail || currentUser.email || currentUser.name)
+        .then(() => {
+          addToast('온라인 저장 완료', '방금 등록한 업무지정을 공용 저장소에도 저장했습니다.', '✅', 'success');
+        })
+        .catch((error) => {
+          addToast(
+            '온라인 저장 실패',
+            `업무지정은 현재 화면에는 저장됐지만 공용 저장소 저장은 실패했습니다. ${getErrorMessage(error, '연결 상태를 확인해 주세요.')}`,
+            '⚠️',
+          );
+        });
+    }
 
     // Auto sync to the facility shared calendar if enabled
     const autoSync = localStorage.getItem(SHARED_CALENDAR_AUTO_SYNC_KEY) === 'true';
