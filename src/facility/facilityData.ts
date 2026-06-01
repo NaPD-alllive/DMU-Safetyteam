@@ -1,6 +1,13 @@
-import { Facility, FacilityAsset, FacilityInspectionSchedule } from './types';
+import { Facility, FacilityAsset, FacilityCategory, FacilityInspectionSchedule } from './types';
 
-export const FACILITY_CATEGORIES = ['강의실', '회의실', '실험실', '체육시설', '공용공간'] as const;
+export const FACILITY_CATEGORIES = ['강의실', '실습실', '행정사무실', '회의실', '도서관', '건물명'] as const;
+
+export const normalizeFacilityCategory = (value: string): FacilityCategory => {
+  if (value === '실험실') return '실습실';
+  if (value === '체육시설' || value === '공용공간') return '건물명';
+  if ((FACILITY_CATEGORIES as readonly string[]).includes(value)) return value as FacilityCategory;
+  return '건물명';
+};
 
 export const FACILITY_STATUSES = ['운영중', '점검중', '예약중지'] as const;
 
@@ -29,8 +36,8 @@ export const DEFAULT_FACILITIES: Facility[] = [
   },
   {
     id: 'facility_lab_safety',
-    name: '공학관 공용 실험실',
-    category: '실험실',
+    name: '공학관 공용 실습실',
+    category: '실습실',
     capacity: 24,
     location: '공학관 4층',
     description: '연구실 안전 점검 대상 시설이며 시설관리팀 확인 후 대관 일정을 등록합니다.',
@@ -41,7 +48,7 @@ export const DEFAULT_FACILITIES: Facility[] = [
   {
     id: 'facility_gym_main',
     name: '종합관 실내체육실',
-    category: '체육시설',
+    category: '건물명',
     capacity: 120,
     location: '종합관 B1',
     description: '체육 수업, 동아리 활동, 행사 준비 공간으로 사용하는 시설입니다.',
@@ -55,7 +62,7 @@ export const DEFAULT_INSPECTION_SCHEDULES: FacilityInspectionSchedule[] = [
   {
     id: 'inspection_lab_safety_monthly',
     facilityId: 'facility_lab_safety',
-    facilityName: '공학관 공용 실험실',
+    facilityName: '공학관 공용 실습실',
     title: '연구실 안전 정기점검',
     inspectionType: '연구실 안전',
     cycle: 'monthly',
@@ -134,7 +141,7 @@ export const DEFAULT_FACILITY_ASSETS: FacilityAsset[] = [
   {
     id: 'asset_lab_shower',
     facilityId: 'facility_lab_safety',
-    facilityName: '공학관 공용 실험실',
+    facilityName: '공학관 공용 실습실',
     name: '비상샤워기 및 세안기',
     assetTag: 'FMS-LAB-SAFE-007',
     category: '안전설비',

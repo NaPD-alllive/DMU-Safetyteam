@@ -27,7 +27,7 @@ const assets: FacilityAsset[] = [
   {
     id: 'repair',
     facilityId: 'facility_2',
-    facilityName: '실험실',
+    facilityName: '실습실',
     name: '비상샤워기',
     assetTag: 'A-002',
     category: '안전',

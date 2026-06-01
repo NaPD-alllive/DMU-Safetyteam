@@ -9,10 +9,11 @@ export interface FacilityUserAccess {
 
 export type FacilityCategory =
   | '강의실'
+  | '실습실'
+  | '행정사무실'
   | '회의실'
-  | '실험실'
-  | '체육시설'
-  | '공용공간';
+  | '도서관'
+  | '건물명';
 
 export type FacilityStatus = '운영중' | '점검중' | '예약중지';
 

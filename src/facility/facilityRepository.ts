@@ -1,4 +1,4 @@
-import { DEFAULT_FACILITIES } from './facilityData';
+import { DEFAULT_FACILITIES, normalizeFacilityCategory } from './facilityData';
 import type { FacilityDataSource } from './dataSourceTypes';
 import { Facility } from './types';
 
@@ -8,7 +8,12 @@ const parseFacilities = (raw: string | null): Facility[] => {
   if (!raw) return DEFAULT_FACILITIES;
   try {
     const parsed = JSON.parse(raw) as unknown;
-    return Array.isArray(parsed) ? (parsed as Facility[]) : DEFAULT_FACILITIES;
+    return Array.isArray(parsed)
+      ? (parsed as Facility[]).map((facility) => ({
+          ...facility,
+          category: normalizeFacilityCategory(facility.category),
+        }))
+      : DEFAULT_FACILITIES;
   } catch {
     return DEFAULT_FACILITIES;
   }

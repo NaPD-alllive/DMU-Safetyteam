@@ -17,7 +17,7 @@ const schedules: FacilityInspectionSchedule[] = [
   {
     id: 'late',
     facilityId: 'facility_1',
-    facilityName: '실험실',
+    facilityName: '실습실',
     title: '지연 점검',
     inspectionType: '안전',
     cycle: 'monthly',
@@ -72,7 +72,7 @@ assert(reopened.find((item) => item.id === 'soon')?.completedAt === undefined, '
 const facility: Facility = {
   id: 'facility_new',
   name: '8호관 대강당',
-  category: '체육시설',
+  category: '건물명',
   capacity: 120,
   location: '8호관',
   description: '행사 및 체육 수업 활용',

@@ -17,6 +17,7 @@ import type {
   FacilityMaintenanceRequest,
   FacilityReservation,
 } from './types';
+import { normalizeFacilityCategory } from './facilityData';
 
 export interface SupabaseProfileRow {
   id: string;
@@ -122,7 +123,7 @@ export const mapProfileRowToAccess = (row: SupabaseProfileRow): FacilityUserAcce
 export const mapFacilityRow = (row: SupabaseFacilityRow): Facility => ({
   id: row.id,
   name: row.name,
-  category: row.category as Facility['category'],
+  category: normalizeFacilityCategory(row.category),
   capacity: row.capacity,
   location: row.location,
   description: row.description,
