@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { BarChart3, Clock, ShieldAlert } from 'lucide-react';
 import type { FacilityUserAccess } from '../facility/types';
-import { isApprovalPending, isCompletionApproved } from '../lib/taskState';
+import { isApprovalPending, isCompletionApproved, isTaskDelayed } from '../lib/taskState';
 import { taskIncludesAssignee } from '../lib/taskAssignees';
 import { Task, UserProfile } from '../types';
 
@@ -41,11 +41,6 @@ const toneClass = {
   },
 };
 
-const isDelayedTask = (task: Task) => {
-  if (task.status === '완료' || !task.dueDate) return false;
-  return new Date(task.dueDate).getTime() < Date.now();
-};
-
 export default function DashboardStats({
   tasks,
   users,
@@ -58,7 +53,7 @@ export default function DashboardStats({
   const total = tasks.length;
   const approved = tasks.filter(isCompletionApproved).length;
   const approvalPending = tasks.filter(isApprovalPending).length;
-  const inProgress = tasks.filter((task) => task.status === '진행중').length;
+  const inProgress = tasks.filter((task) => task.status === '진행중' && !isTaskDelayed(task)).length;
   const pending = tasks.filter((task) => task.status === '대기중').length;
   const urgent = tasks.filter((task) => task.priority === '긴급' && task.status !== '완료').length;
   const completionRate = total > 0 ? Math.round((approved / total) * 100) : 0;
@@ -67,11 +62,12 @@ export default function DashboardStats({
   const getUserTaskCount = (userName: string, status?: '대기중' | '진행중' | '완료') =>
     tasks.filter((task) => {
       const matchesUser = taskIncludesAssignee(task.assignee, userName);
+      if (status === '진행중') return matchesUser && task.status === status && !isTaskDelayed(task);
       return status ? matchesUser && task.status === status : matchesUser;
     }).length;
 
   const getUserDelayedTaskCount = (userName: string) =>
-    tasks.filter((task) => taskIncludesAssignee(task.assignee, userName) && isDelayedTask(task)).length;
+    tasks.filter((task) => taskIncludesAssignee(task.assignee, userName) && isTaskDelayed(task)).length;
 
   return (
     <div className="space-y-3 mb-4" id="dashboard-stats-container">
@@ -91,14 +87,14 @@ export default function DashboardStats({
         />
         <StatCard
           icon={Clock}
-          label="현장 조치 진행중"
+          label="작업중"
           value={`${inProgress}건`}
           caption="실시간 배정"
           tone="amber"
         />
         <StatCard
           icon={BarChart3}
-          label="조치 대기"
+          label="접수대기"
           value={`${pending}건`}
           caption="신규 오더"
           tone="indigo"

@@ -21,6 +21,7 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [priority, setPriority] = useState<TaskPriority>('보통');
+  const [dueDate, setDueDate] = useState('');
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined);
   const [dragActive, setDragActive] = useState(false);
@@ -94,6 +95,7 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
       location: location.trim(),
       priority,
       assignee: selectedAssignees.join(', '),
+      dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
       photoUrl,
     });
 
@@ -103,6 +105,7 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
     setDescription('');
     setLocation('');
     setPriority('보통');
+    setDueDate('');
     setSelectedAssignees([]);
     setPhotoUrl(undefined);
     onClose();
@@ -204,6 +207,19 @@ export default function NewTaskModal({ isOpen, onClose, onSave, users }: NewTask
                   );
                 })}
               </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-1">완료 예정일시</label>
+            <input
+              type="datetime-local"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl border border-slate-800/80 bg-slate-950 text-xs focus:ring-2 focus:ring-indigo-500/25 focus:border-indigo-400 outline-none text-white font-semibold"
+            />
+            <p className="text-[10px] text-slate-500 font-bold leading-relaxed">
+              이 시간이 지나도 완료 전이면 목록과 시설관리팀 현황에 지연으로 표시됩니다.
+            </p>
           </div>
 
           {/* Description */}

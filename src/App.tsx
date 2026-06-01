@@ -407,7 +407,6 @@ export default function App() {
     setSoundEnabled(Boolean(snapshot.soundEnabled));
     localStorage.setItem('fms_sound_enabled', String(Boolean(snapshot.soundEnabled)));
     if (resetView) {
-      closeTaskDetail();
       setSelectedStatus('전체');
       setSearchQuery('');
       setShowMyTasksOnly(currentUser.role !== '팀장');
@@ -583,8 +582,7 @@ export default function App() {
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
       const matchStatus =
-        selectedStatus === '전체' ||
-        (selectedStatus === '승인대기' ? isApprovalPending(t) : t.status === selectedStatus);
+        selectedStatus === '전체' || getTaskStatusLabel(t) === selectedStatus;
       const matchOwner = !showMyTasksOnly || currentUser.role === '팀장' || taskIncludesAssignee(t.assignee, currentUser.name);
       
       const text = `${t.category} ${t.title} ${t.description} ${t.location} ${t.assignee}`.toLowerCase();
@@ -694,6 +692,7 @@ export default function App() {
     priority: TaskPriority;
     assignee: string;
     photoUrl?: string;
+    dueDate?: string;
   }) => {
     const timestamp = new Date().toISOString();
     const newTask: Task = {
@@ -706,6 +705,7 @@ export default function App() {
       location: data.location,
       assignee: data.assignee,
       createdAt: timestamp,
+      dueDate: data.dueDate,
       photoUrl: data.photoUrl,
       comments: [],
       history: [
@@ -726,7 +726,7 @@ export default function App() {
       type: '등록',
       senderName: currentUser.name,
       senderRole: currentUser.role,
-      message: `[배정 알림/${data.category}] ${data.assignee} 담당자에게 '${data.title}' 업무가 배정되었습니다. 업무지정 화면에서 확인 후 조치 내용을 입력해 주세요.`,
+      message: `[배정 알림/${data.category}] ${data.assignee} 담당자에게 '${data.title}' 업무가 배정되었습니다. 업무지정 화면에서 업무 접수 후 완료 내용을 입력해 주세요.`,
       timestamp,
       read: false,
     };
@@ -781,7 +781,7 @@ export default function App() {
     }
   };
 
-  // Update Status Action (대기중 -> 진행중)
+  // Update Status Action (접수대기 -> 작업중)
   const handleUpdateStatus = (taskId: string, newStatus: TaskStatus) => {
     const timestamp = new Date().toISOString();
     const targetTask = tasks.find((t) => t.id === taskId);
@@ -796,7 +796,7 @@ export default function App() {
           id: `h_${Date.now()}`,
           timestamp,
           user: `${currentUser.name} (${currentUser.role})`,
-          action: `업무를 확인하고 작업 단계를 [${t.status}]에서 [${newStatus}]으로 전환했습니다.`
+          action: `업무를 접수하고 작업중으로 전환했습니다.`
         }
       ];
       return { ...t, status: newStatus, history: updatedHistory };
@@ -819,8 +819,8 @@ export default function App() {
     setNotifications(nextNotifications);
     persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
     addToast(
-      '업무 확인 완료',
-      `'${targetTask.title}' 업무 상태를 [진행중]으로 전환했습니다.`,
+      '업무 접수 완료',
+      `'${targetTask.title}' 업무를 접수하고 [작업중]으로 전환했습니다.`,
       currentUser.avatar,
       'normal'
     );
@@ -877,7 +877,7 @@ export default function App() {
       type: '완료보고',
       senderName: currentUser.name,
       senderRole: currentUser.role,
-      message: `[조치 내용 입력] ${currentUser.name}님이 '${targetTask.title}' 업무 조치 내용을 저장했습니다. 팀장 확인이 필요합니다.`,
+      message: `[완료 내용 입력] ${currentUser.name}님이 '${targetTask.title}' 업무 완료 내용을 저장했습니다. 팀장 확인이 필요합니다.`,
       timestamp,
       read: false,
     };
@@ -888,8 +888,8 @@ export default function App() {
     persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
     
     addToast(
-      '조치 내용 저장 완료',
-      `'${targetTask.title}' 업무 조치 내용이 저장되었습니다. 나형석 팀장의 최종 승인을 기다립니다.`,
+      '완료 내용 저장 완료',
+      `'${targetTask.title}' 업무 완료 내용이 저장되었습니다. 나형석 팀장의 최종 승인을 기다립니다.`,
       currentUser.avatar,
       'success'
     );
@@ -1137,15 +1137,25 @@ export default function App() {
 
   const handleNotificationClick = (taskId: string, notifId: string) => {
     markNotificationsReadByIds(new Set([notifId]));
-    const target = tasks.find((t) => t.id === taskId);
+    const notification = notifications.find((item) => item.id === notifId);
+    const target =
+      tasks.find((t) => t.id === taskId) ||
+      tasks.find((t) => notification?.taskTitle && t.title === notification.taskTitle) ||
+      tasks.find((t) => notification?.taskTitle && (t.title.includes(notification.taskTitle) || notification.taskTitle.includes(t.title)));
+
     if (target) {
       setActiveTab('tasks');
       setSelectedStatus('전체');
       setSearchQuery('');
-      if (currentUser.role !== '팀장') {
-        setShowMyTasksOnly(true);
-      }
-      openTaskDetail(target);
+      const isAssignedToCurrentUser = currentUser.role !== '팀장' && taskIncludesAssignee(target.assignee, currentUser.name);
+      setShowMyTasksOnly(isAssignedToCurrentUser);
+      openTaskDetail(target, isAssignedToCurrentUser);
+    } else {
+      setActiveTab('tasks');
+      setSelectedStatus('전체');
+      setSearchQuery(notification?.taskTitle || '');
+      setShowMyTasksOnly(false);
+      addToast('업무 확인 필요', '알림과 연결된 업무를 바로 찾지 못해 업무지정 목록에서 제목으로 검색했습니다.', '⚠️');
     }
     setShowNotifications(false);
   };
@@ -1454,7 +1464,7 @@ export default function App() {
               </div>
               <p className="mt-2 text-sm text-slate-200 font-semibold leading-relaxed">
                 {newAssignedTasks.length > 0
-                  ? `${currentUser.name}님에게 새로 배정된 대기 업무가 ${newAssignedTasks.length}건 있습니다. 업무지정에서 확인 후 조치 내용을 입력해 주세요.`
+                  ? `${currentUser.name}님에게 새로 배정된 접수대기 업무가 ${newAssignedTasks.length}건 있습니다. 업무지정에서 업무 접수 후 완료 내용을 입력해 주세요.`
                   : activeAssignedTasks.length > 0
                     ? `${currentUser.name}님이 처리 중이거나 승인 대기 중인 업무가 ${activeAssignedTasks.length}건 있습니다.`
                     : `${currentUser.name}님에게 현재 진행할 배정 업무는 없습니다.`}
@@ -1520,7 +1530,7 @@ export default function App() {
             <div className="flex items-center space-x-1.5" id="status-filter-group">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-500 h-max select-none">진행 상태:</span>
               <div className="bg-slate-950 border border-slate-850 p-1 rounded-xl flex items-center">
-                {['전체', '대기중', '진행중', '승인대기', '완료'].map((status) => (
+                {['전체', '접수대기', '작업중', '완료', '지연'].map((status) => (
                   <button
                     key={status}
                     onClick={() => setSelectedStatus(status)}
@@ -1688,7 +1698,10 @@ export default function App() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60 font-semibold text-slate-300">
-                  {filteredTasks.map((t) => (
+                  {filteredTasks.map((t) => {
+                    const statusLabel = getTaskStatusLabel(t);
+
+                    return (
                     <tr 
                       key={t.id}
                       onClick={() => openTaskDetail(t)}
@@ -1696,12 +1709,12 @@ export default function App() {
                     >
                       <td className="p-4">
                         <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                          getTaskStatusLabel(t) === '승인대기' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                          t.status === '완료' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                          t.status === '진행중' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
+                          statusLabel === '지연' ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' :
+                          statusLabel === '완료' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
+                          statusLabel === '작업중' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20 animate-pulse' :
                           'bg-slate-800 text-slate-400 border border-slate-700'
                         }`}>
-                          {getTaskStatusLabel(t)}
+                          {statusLabel}
                         </span>
                       </td>
                       <td className="p-4">
@@ -1729,7 +1742,8 @@ export default function App() {
                         {new Date(t.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>

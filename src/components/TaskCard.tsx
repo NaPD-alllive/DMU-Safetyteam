@@ -1,7 +1,7 @@
 import React from 'react';
 import { Task } from '../types';
 import { MapPin, Calendar, Clock, AlertTriangle, Paperclip, MessageSquare, CheckSquare } from 'lucide-react';
-import { getTaskStatusLabel } from '../lib/taskState';
+import { getTaskStatusLabel, isApprovalPending } from '../lib/taskState';
 import { formatTaskAssigneeLabel, splitTaskAssignees } from '../lib/taskAssignees';
 
 interface TaskCardProps {
@@ -25,7 +25,13 @@ export default function TaskCard({ task, onSelect, onAssigneeAction, isSynced, i
   const statusLabel = getTaskStatusLabel(task);
   const assigneeNames = splitTaskAssignees(task.assignee);
   const primaryAssignee = assigneeNames[0] || '';
-  const showAssigneeAction = isCurrentUserAssignee && (task.status !== '완료' || statusLabel === '승인대기');
+  const showAssigneeAction = isCurrentUserAssignee && (task.status !== '완료' || isApprovalPending(task));
+  const assigneeActionLabel =
+    task.status === '대기중'
+      ? '업무 접수'
+      : task.status === '완료'
+        ? '완료 내용 확인 / 수정'
+        : '완료 내용 입력';
 
   // Format date readable
   const formatDate = (dateString: string) => {
@@ -89,7 +95,7 @@ export default function TaskCard({ task, onSelect, onAssigneeAction, isSynced, i
           className="mb-4 w-full rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm font-black text-emerald-100 hover:bg-emerald-500/25 hover:border-emerald-300 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/5"
         >
           <CheckSquare className="w-4 h-4 text-emerald-300" />
-          <span>{task.status === '대기중' ? '업무 접수 / 조치 입력' : '조치 내용 입력 / 보고'}</span>
+          <span>{assigneeActionLabel}</span>
         </button>
       )}
 
@@ -103,12 +109,16 @@ export default function TaskCard({ task, onSelect, onAssigneeAction, isSynced, i
           <Calendar className="w-3.5 h-3.5 shrink-0" />
           <span>등록일: {formatDate(task.createdAt)}</span>
         </div>
+        {task.dueDate && (
+          <div className="flex items-center space-x-1.5 text-slate-500">
+            <Clock className="w-3.5 h-3.5 shrink-0" />
+            <span>완료 예정: {formatDate(task.dueDate)}</span>
+          </div>
+        )}
         {task.completedAt && (
-          <div className={`flex items-center space-x-1.5 font-extrabold uppercase tracking-wider text-[10.5px] ${
-            statusLabel === '승인대기' ? 'text-amber-400' : 'text-emerald-400'
-          }`}>
-            <CheckSquare className={`w-3.5 h-3.5 shrink-0 ${statusLabel === '승인대기' ? 'text-amber-500' : 'text-emerald-500'}`} />
-            <span>{statusLabel === '승인대기' ? '보고 일시' : '완료 일시'}: {formatDate(task.completedAt)}</span>
+          <div className="flex items-center space-x-1.5 font-extrabold uppercase tracking-wider text-[10.5px] text-emerald-400">
+            <CheckSquare className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+            <span>완료 일시: {formatDate(task.completedAt)}</span>
           </div>
         )}
       </div>
@@ -142,27 +152,27 @@ export default function TaskCard({ task, onSelect, onAssigneeAction, isSynced, i
             )}
           </div>
 
-          {task.status === '대기중' && (
-            <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-slate-800 text-slate-300 border border-slate-700">
-              대기중
+          {statusLabel === '지연' && (
+            <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-rose-500/10 text-rose-300 border border-rose-500/30 flex items-center space-x-1">
+              <AlertTriangle className="w-3 h-3 text-rose-300" />
+              <span>지연</span>
             </span>
           )}
-          {task.status === '진행중' && (
+          {statusLabel === '접수대기' && (
+            <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+              접수대기
+            </span>
+          )}
+          {statusLabel === '작업중' && (
             <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center space-x-1 animate-pulse">
               <Clock className="w-3 h-3 text-amber-400 animate-spin" />
-              <span>진행 중</span>
+              <span>작업중</span>
             </span>
           )}
-          {task.status === '완료' && statusLabel === '승인대기' && (
-            <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center">
-              <Clock className="w-3.5 h-3.5 text-amber-400 mr-1" />
-              승인 대기
-            </span>
-          )}
-          {task.status === '완료' && statusLabel !== '승인대기' && (
+          {statusLabel === '완료' && (
             <span className="px-3.5 py-1.5 text-[10px] font-black uppercase tracking-wider rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center">
               <CheckSquare className="w-3.5 h-3.5 text-emerald-400 mr-1" />
-              {statusLabel === '승인완료' ? '승인 완료' : '완료'}
+              완료
             </span>
           )}
         </div>
