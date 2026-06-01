@@ -43,6 +43,7 @@ export default function TaskDetailModal({
   onSyncSingle,
 }: TaskDetailModalProps) {
   const [commentText, setCommentText] = useState('');
+  const [additionalWorkText, setAdditionalWorkText] = useState('');
   const [reportText, setReportText] = useState('');
   const [completionPhoto, setCompletionPhoto] = useState<string | undefined>(undefined);
   const [isPhotoUploading, setIsPhotoUploading] = useState(false);
@@ -72,6 +73,13 @@ export default function TaskDetailModal({
     if (!commentText.trim()) return;
     onAddComment(task.id, commentText.trim());
     setCommentText('');
+  };
+
+  const handleAdditionalWorkSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!additionalWorkText.trim()) return;
+    onAddComment(task.id, `[추가 작업] ${additionalWorkText.trim()}`);
+    setAdditionalWorkText('');
   };
 
   const readSelectedImage = async (file: File) => {
@@ -353,6 +361,27 @@ export default function TaskDetailModal({
                     <div className="font-black text-emerald-300 mb-1">내 담당 업무입니다.</div>
                     업무를 확인한 뒤 진행을 시작하거나, 현장에서 조치한 내용을 아래 입력칸에 바로 저장할 수 있습니다.
                   </div>
+
+                  <form onSubmit={handleAdditionalWorkSubmit} className="rounded-2xl border border-indigo-500/25 bg-indigo-500/10 p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-black text-indigo-200">추가 작업 기록</span>
+                      <span className="text-[9px] text-slate-500 font-black">완료보고 전/후 계속 입력 가능</span>
+                    </div>
+                    <textarea
+                      value={additionalWorkText}
+                      onChange={(e) => setAdditionalWorkText(e.target.value)}
+                      placeholder="추가로 확인한 작업, 후속 조치, 현장 특이사항, 남은 작업을 입력해 주세요."
+                      className="w-full p-3 text-xs border border-slate-800 rounded-xl outline-none focus:border-indigo-400 bg-slate-950 block h-16 text-white font-semibold placeholder:text-slate-600"
+                    />
+                    <button
+                      type="submit"
+                      disabled={!additionalWorkText.trim()}
+                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-black text-[11px] rounded-xl transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    >
+                      <Send className="w-3.5 h-3.5" />
+                      <span>추가 작업 저장</span>
+                    </button>
+                  </form>
 
                   {task.status === '대기중' && (
                     <button

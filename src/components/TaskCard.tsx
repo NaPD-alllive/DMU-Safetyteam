@@ -10,6 +10,7 @@ interface TaskCardProps {
   onSelect: (task: Task) => void;
   currentUserSpecialty?: string;
   isSynced?: boolean;
+  isCurrentUserAssignee?: boolean;
 }
 
 const PRIORITY_STYLES = {
@@ -18,11 +19,12 @@ const PRIORITY_STYLES = {
   '낮음': { bg: 'bg-slate-800 text-slate-400 border border-slate-700 font-bold uppercase tracking-wider', icon: null },
 };
 
-export default function TaskCard({ task, onSelect, isSynced }: TaskCardProps) {
+export default function TaskCard({ task, onSelect, isSynced, isCurrentUserAssignee = false }: TaskCardProps) {
   const priorityStyle = PRIORITY_STYLES[task.priority] || PRIORITY_STYLES['보통'];
   const statusLabel = getTaskStatusLabel(task);
   const assigneeNames = splitTaskAssignees(task.assignee);
   const primaryAssignee = assigneeNames[0] || '';
+  const showAssigneeAction = isCurrentUserAssignee && (task.status !== '완료' || statusLabel === '승인대기');
 
   // Format date readable
   const formatDate = (dateString: string) => {
@@ -71,6 +73,20 @@ export default function TaskCard({ task, onSelect, isSynced }: TaskCardProps) {
       <h3 className="text-white font-black text-base md:text-lg tracking-tight line-clamp-2 mb-2 leading-tight group-hover:text-indigo-400 transition-colors duration-200">
         {task.title}
       </h3>
+
+      {showAssigneeAction && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onSelect(task);
+          }}
+          className="mb-4 w-full rounded-2xl border border-emerald-400/40 bg-emerald-500/15 px-4 py-3 text-sm font-black text-emerald-100 hover:bg-emerald-500/25 hover:border-emerald-300 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/5"
+        >
+          <CheckSquare className="w-4 h-4 text-emerald-300" />
+          <span>{task.status === '대기중' ? '업무 확인 / 조치 입력' : '조치 내용 입력 / 보고'}</span>
+        </button>
+      )}
 
       {/* Info labels */}
       <div className="space-y-2 text-xs text-slate-400 mb-5 flex-grow font-semibold">

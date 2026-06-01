@@ -170,6 +170,7 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const taskListRef = useRef<HTMLElement>(null);
   const hadStoredAppDataRef = useRef(
     Boolean(
       localStorage.getItem('fms_tasks') ||
@@ -626,6 +627,22 @@ export default function App() {
   const unreadNotifCount = useMemo(() => {
     return visibleNotifications.filter((n) => !n.read).length;
   }, [visibleNotifications]);
+
+  const scrollToTaskList = useCallback(() => {
+    window.setTimeout(() => {
+      taskListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }, []);
+
+  const showAssignedTaskList = useCallback(() => {
+    setActiveTab('tasks');
+    setSelectedTask(null);
+    setSelectedStatus('전체');
+    setSearchQuery('');
+    setShowMyTasksOnly(true);
+    setViewMode('grid');
+    scrollToTaskList();
+  }, [scrollToTaskList]);
 
   // 5. Actions handlers
 
@@ -1418,13 +1435,7 @@ export default function App() {
             </div>
             <button
               type="button"
-              onClick={() => {
-                setActiveTab('tasks');
-                setSelectedStatus('전체');
-                setSearchQuery('');
-                setShowMyTasksOnly(true);
-                setViewMode('grid');
-              }}
+              onClick={showAssignedTaskList}
               className="shrink-0 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 text-sm font-black shadow-lg border border-emerald-400/30"
             >
               내 배정 업무 보기
@@ -1435,7 +1446,7 @@ export default function App() {
         {activeTab === 'tasks' ? (
           <>
             {/* 3. Search and Actions Toolbar */}
-        <section className="bg-slate-900/50 backdrop-blur-md p-5 rounded-3xl border border-slate-800 shadow-xl flex flex-col md:flex-row gap-4 items-center justify-between" id="search-filter-toolbar">
+        <section ref={taskListRef} className="bg-slate-900/50 backdrop-blur-md p-5 rounded-3xl border border-slate-800 shadow-xl flex flex-col md:flex-row gap-4 items-center justify-between scroll-mt-24" id="search-filter-toolbar">
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
             
             {/* Search Input Box */}
@@ -1608,6 +1619,7 @@ export default function App() {
                 task={task} 
                 onSelect={(t) => setSelectedTask(t)} 
                 isSynced={syncedTaskIds.includes(task.id)}
+                isCurrentUserAssignee={currentUser.role !== '팀장' && taskIncludesAssignee(task.assignee, currentUser.name)}
               />
             ))}
           </div>
