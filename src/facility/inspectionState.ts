@@ -1,4 +1,4 @@
-import { FacilityInspectionSchedule } from './types';
+import type { Facility, FacilityInspectionSchedule, InspectionFormValues } from './types';
 
 export type InspectionDisplayStatus = 'scheduled' | 'dueSoon' | 'overdue' | 'completed';
 
@@ -25,6 +25,39 @@ export const countOpenInspectionRisks = (
   const status = getInspectionDisplayStatus(schedule, now);
   return status === 'overdue' || status === 'dueSoon';
 }).length;
+
+export const buildInspectionSchedule = (
+  values: InspectionFormValues,
+  facility: Facility,
+  now = new Date(),
+): FacilityInspectionSchedule => {
+  const timestamp = now.toISOString();
+
+  return {
+    id: `inspection_${now.getTime()}`,
+    facilityId: facility.id,
+    facilityName: facility.name,
+    title: values.title.trim(),
+    inspectionType: values.inspectionType.trim(),
+    cycle: values.cycle,
+    inspectorName: values.inspectorName.trim(),
+    dueDate: values.dueDate,
+    status: 'scheduled',
+    notes: values.notes?.trim() || undefined,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+};
+
+export const addInspectionSchedule = (
+  schedules: FacilityInspectionSchedule[],
+  values: InspectionFormValues,
+  facility: Facility,
+  now = new Date(),
+) => [
+  buildInspectionSchedule(values, facility, now),
+  ...schedules,
+];
 
 export const completeInspectionSchedule = (
   schedules: FacilityInspectionSchedule[],

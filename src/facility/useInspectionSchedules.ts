@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { FACILITY_SNAPSHOT_APPLIED_EVENT } from './facilitySnapshot';
 import { inspectionRepository } from './inspectionRepository';
 import {
+  addInspectionSchedule,
   completeInspectionSchedule,
   reopenInspectionSchedule,
   sortInspectionSchedules,
 } from './inspectionState';
+import type { Facility, InspectionFormValues } from './types';
 
 const PAGE_SIZE = 5;
 
@@ -29,6 +31,11 @@ export const useInspectionSchedules = () => {
   const pageCount = Math.max(1, Math.ceil(sortedSchedules.length / PAGE_SIZE));
   const pageItems = sortedSchedules.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const addSchedule = (values: InspectionFormValues, facility: Facility) => {
+    setSchedules((previous) => addInspectionSchedule(previous, values, facility));
+    setPage(1);
+  };
+
   const completeSchedule = (id: string) =>
     setSchedules((previous) => completeInspectionSchedule(previous, id));
 
@@ -42,6 +49,7 @@ export const useInspectionSchedules = () => {
     pageCount,
     pageItems,
     setPage,
+    addSchedule,
     completeSchedule,
     reopenSchedule,
   };

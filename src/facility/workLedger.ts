@@ -3,6 +3,7 @@ import { getTaskStatusLabel } from '../lib/taskState';
 import { DEFAULT_DAILY_LOG_WORK_TYPE } from '../lib/dailyLogWorkTypes';
 import { WORK_UNIT_DEFINITIONS, getWorkUnitById } from './workUnitData';
 import type {
+  FacilityInspectionSchedule,
   WorkLedgerEntry,
   WorkUnitDefinition,
 } from './types';
@@ -10,6 +11,7 @@ import type {
 interface WorkLedgerSources {
   tasks: Task[];
   dailyLogs: DailyLog[];
+  inspectionSchedules?: FacilityInspectionSchedule[];
 }
 
 const fallbackUnit = WORK_UNIT_DEFINITIONS[0];
@@ -91,8 +93,41 @@ const dailyLogToEntry = (log: DailyLog): WorkLedgerEntry => {
   });
 };
 
+const inspectionCycleLabel = {
+  weekly: '주간',
+  monthly: '월간',
+  quarterly: '분기',
+  yearly: '연간',
+};
+
+const inspectionToEntry = (schedule: FacilityInspectionSchedule): WorkLedgerEntry =>
+  buildEntry({
+    id: `inspection-${schedule.id}`,
+    source: '점검일정',
+    sourceId: schedule.id,
+    date: schedule.completedAt || schedule.updatedAt || schedule.dueDate,
+    title: schedule.title,
+    unitId: pickWorkUnitId(`${schedule.facilityName} ${schedule.title} ${schedule.inspectionType} ${schedule.notes || ''}`),
+    status: '완료',
+    description: [
+      `점검유형: ${schedule.inspectionType}`,
+      `점검주기: ${inspectionCycleLabel[schedule.cycle]}`,
+      `점검예정일: ${schedule.dueDate}`,
+      schedule.completedAt ? `완료일시: ${schedule.completedAt}` : '',
+      schedule.notes ? `메모: ${schedule.notes}` : '',
+    ].filter(Boolean).join('\n'),
+    evidence: '점검일정 이력',
+    facilityName: schedule.facilityName,
+    location: schedule.facilityName,
+    assignee: schedule.inspectorName,
+    createdAt: schedule.createdAt,
+  });
+
 export const buildWorkLedgerEntries = (sources: WorkLedgerSources): WorkLedgerEntry[] =>
   [
     ...sources.tasks.map(taskToEntry),
     ...sources.dailyLogs.map(dailyLogToEntry),
+    ...(sources.inspectionSchedules ?? [])
+      .filter((schedule) => schedule.status === 'completed')
+      .map(inspectionToEntry),
   ].sort((first, second) => new Date(second.date).getTime() - new Date(first.date).getTime());

@@ -137,6 +137,16 @@ export interface FacilityInspectionSchedule {
   updatedAt: string;
 }
 
+export interface InspectionFormValues {
+  facilityId: string;
+  title: string;
+  inspectionType: string;
+  cycle: InspectionCycle;
+  inspectorName: string;
+  dueDate: string;
+  notes?: string;
+}
+
 export type FacilityAssetStatus = 'active' | 'maintenance' | 'retired';
 
 export type FacilityAssetCondition = 'good' | 'watch' | 'repair';
@@ -180,7 +190,8 @@ export type WorkUnitDifficulty = 'A' | 'B' | 'C';
 
 export type WorkLedgerSource =
   | '업무지정'
-  | 'Self-Managed Work Logs';
+  | 'Self-Managed Work Logs'
+  | '점검일정';
 
 export interface WorkUnitDefinition {
   id: string;

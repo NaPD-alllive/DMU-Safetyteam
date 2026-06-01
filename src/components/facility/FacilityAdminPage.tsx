@@ -36,6 +36,7 @@ import {
   FacilityRole,
   FacilityAssetCondition,
   FacilityAssetStatus,
+  InspectionFormValues,
   ReservationFormValues,
   ReservationStatus,
 } from '../../facility/types';
@@ -139,7 +140,8 @@ export default function FacilityAdminPage({
   const workLedgerEntries = useMemo(() => buildWorkLedgerEntries({
     tasks,
     dailyLogs,
-  }), [dailyLogs, tasks]);
+    inspectionSchedules: inspections.schedules,
+  }), [dailyLogs, inspections.schedules, tasks]);
 
   useEffect(() => {
     store.setPage(1);
@@ -278,6 +280,18 @@ export default function FacilityAdminPage({
     addToast('점검 완료', '시설 점검일정을 완료 처리했습니다.', '✅');
   };
 
+  const addInspection = (values: InspectionFormValues) => {
+    if (!canManageInspections(role)) return;
+    const facility = store.facilities.find((item) => item.id === values.facilityId);
+    if (!facility) {
+      addToast('점검일정 등록 실패', '대상 시설을 먼저 확인해 주세요.', '⚠️');
+      return;
+    }
+
+    inspections.addSchedule(values, facility);
+    addToast('점검일정 등록 완료', `${facility.name} 점검일정이 등록되었습니다.`, '📅');
+  };
+
   const reopenInspection = (id: string) => {
     if (!canManageInspections(role)) return;
     inspections.reopenSchedule(id);
@@ -358,10 +372,12 @@ export default function FacilityAdminPage({
 
       {activeSection === 'inspections' && (
         <FacilityInspectionSchedulePanel
+          facilities={store.facilities}
           schedules={inspections.pageItems}
           page={inspections.page}
           pageCount={inspections.pageCount}
           role={role}
+          onAdd={addInspection}
           onPageChange={inspections.setPage}
           onComplete={completeInspection}
           onReopen={reopenInspection}

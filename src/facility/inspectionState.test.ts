@@ -1,11 +1,12 @@
 import {
+  addInspectionSchedule,
   completeInspectionSchedule,
   countOpenInspectionRisks,
   getInspectionDisplayStatus,
   reopenInspectionSchedule,
   sortInspectionSchedules,
 } from './inspectionState';
-import { FacilityInspectionSchedule } from './types';
+import type { Facility, FacilityInspectionSchedule } from './types';
 
 const assert = (condition: boolean, message: string) => {
   if (!condition) throw new Error(message);
@@ -67,5 +68,36 @@ assert(completed.find((item) => item.id === 'soon')?.status === 'completed', 'co
 const reopened = reopenInspectionSchedule(completed, 'soon', '2026-05-27T12:00:00Z');
 assert(reopened.find((item) => item.id === 'soon')?.status === 'scheduled', 'reopen action should restore scheduled status');
 assert(reopened.find((item) => item.id === 'soon')?.completedAt === undefined, 'reopen action should clear completedAt');
+
+const facility: Facility = {
+  id: 'facility_new',
+  name: '8호관 대강당',
+  category: '체육시설',
+  capacity: 120,
+  location: '8호관',
+  description: '행사 및 체육 수업 활용',
+  status: '운영중',
+  createdAt: '2026-05-01T00:00:00Z',
+  updatedAt: '2026-05-01T00:00:00Z',
+};
+
+const added = addInspectionSchedule(
+  schedules,
+  {
+    facilityId: facility.id,
+    title: '승강기 정기점검',
+    inspectionType: '승강기',
+    cycle: 'monthly',
+    inspectorName: '오승훈',
+    dueDate: '2026-06-10',
+    notes: '정기 안전 확인',
+  },
+  facility,
+  new Date('2026-05-27T13:00:00Z'),
+);
+
+assert(added[0].id === 'inspection_1779886800000', 'add action should create predictable schedule id');
+assert(added[0].facilityName === '8호관 대강당', 'add action should copy selected facility name');
+assert(added[0].status === 'scheduled', 'new inspection should start as scheduled');
 
 console.log('inspection state tests passed');
