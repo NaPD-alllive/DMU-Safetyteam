@@ -63,6 +63,13 @@ interface Toast {
 type NotificationTone = 'normal' | 'urgent' | 'success';
 type ManagerActionPayload = TaskPriority | string;
 
+type SharedPersistOptions = {
+  successTitle?: string;
+  successMessage?: string;
+  errorTitle?: string;
+  errorMessage?: string;
+};
+
 type AudioContextWindow = Window &
   typeof globalThis & {
     webkitAudioContext?: typeof AudioContext;
@@ -283,6 +290,13 @@ export default function App() {
     setCurrentUser(user);
     setAuthenticatedEmail(email);
     setIsAuthReady(true);
+    setSelectedStatus('전체');
+    setSearchQuery('');
+    setViewMode('grid');
+    setShowMyTasksOnly(user.role !== '팀장');
+    if (user.role !== '팀장') {
+      setActiveTab('tasks');
+    }
   }, []);
 
   const handleSignOut = () => {
@@ -298,19 +312,19 @@ export default function App() {
     window.location.assign(SUPPLY_PURCHASE_REQUEST_URL);
   };
 
-  const createAppSnapshot = useCallback((): FacilityAppState => ({
+  const createAppSnapshot = useCallback((overrides: Partial<FacilityAppState> = {}): FacilityAppState => ({
     app: 'DMU_FACILITY_MANAGEMENT',
     version: 1,
     exportedAt: new Date().toISOString(),
-    tasks,
-    notifications,
-    dailyLogs,
-    syncedTaskIds,
-    calendarWebAppUrl,
-    calendarWebhookSecret,
-    soundEnabled,
-    facilityUserAccess: facilityAccess.accessList,
-    facilityModule: readFacilityModuleSnapshot(),
+    tasks: overrides.tasks ?? tasks,
+    notifications: overrides.notifications ?? notifications,
+    dailyLogs: overrides.dailyLogs ?? dailyLogs,
+    syncedTaskIds: overrides.syncedTaskIds ?? syncedTaskIds,
+    calendarWebAppUrl: overrides.calendarWebAppUrl ?? calendarWebAppUrl,
+    calendarWebhookSecret: overrides.calendarWebhookSecret ?? calendarWebhookSecret,
+    soundEnabled: overrides.soundEnabled ?? soundEnabled,
+    facilityUserAccess: overrides.facilityUserAccess ?? facilityAccess.accessList,
+    facilityModule: overrides.facilityModule ?? readFacilityModuleSnapshot(),
   }), [
     tasks,
     notifications,
@@ -322,7 +336,45 @@ export default function App() {
     facilityAccess.accessList,
   ]);
 
-  const applyAppSnapshot = useCallback((snapshot: FacilityAppState) => {
+  const persistSharedState = (
+    overrides: Partial<FacilityAppState>,
+    options: SharedPersistOptions = {},
+  ) => {
+    const snapshotToSave = createAppSnapshot(overrides);
+    const updatedBy = authenticatedEmail || currentUser.email || currentUser.name;
+    const errorTitle = options.errorTitle || '공용 저장 실패';
+    const errorMessage = options.errorMessage || '변경 내용은 현재 화면에 저장됐지만 공용 저장소 반영은 실패했습니다.';
+
+    if (supabaseStateConfig.enabled) {
+      void saveSupabaseState(snapshotToSave, updatedBy)
+        .then(() => {
+          if (options.successTitle) {
+            addToast(options.successTitle, options.successMessage || '공용 저장소에 반영했습니다.', '✅', 'success');
+          }
+        })
+        .catch((error) => {
+          addToast(errorTitle, `${errorMessage} ${getErrorMessage(error, '연결 상태를 확인해 주세요.')}`, '⚠️');
+        });
+      return;
+    }
+
+    void fetch('/api/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshotToSave),
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error('서버 저장에 실패했습니다.');
+        if (options.successTitle) {
+          addToast(options.successTitle, options.successMessage || '공용 저장소에 반영했습니다.', '✅', 'success');
+        }
+      })
+      .catch((error) => {
+        addToast(errorTitle, `${errorMessage} ${getErrorMessage(error, '팀원 공용 저장소 연결 상태를 확인해 주세요.')}`, '⚠️');
+      });
+  };
+
+  const applyAppSnapshot = useCallback((snapshot: FacilityAppState, resetView = true) => {
     if (!isFacilityAppState(snapshot)) {
       throw new Error('시설관리 시스템 데이터 형식이 아닙니다.');
     }
@@ -342,11 +394,16 @@ export default function App() {
     }
     setSoundEnabled(Boolean(snapshot.soundEnabled));
     localStorage.setItem('fms_sound_enabled', String(Boolean(snapshot.soundEnabled)));
-    setSelectedTask(null);
-    setSelectedStatus('전체');
-    setSearchQuery('');
-    setShowMyTasksOnly(false);
-  }, [facilityAccess]);
+    if (resetView) {
+      setSelectedTask(null);
+      setSelectedStatus('전체');
+      setSearchQuery('');
+      setShowMyTasksOnly(currentUser.role !== '팀장');
+      if (currentUser.role !== '팀장') {
+        setActiveTab('tasks');
+      }
+    }
+  }, [currentUser.role, facilityAccess]);
 
   useEffect(() => {
     if (requiresSupabaseLogin && !isAuthReady) return;
@@ -380,6 +437,38 @@ export default function App() {
 
     return () => {
       cancelled = true;
+    };
+  }, [applyAppSnapshot, isAuthReady, requiresSupabaseLogin, supabaseStateConfig.enabled]);
+
+  useEffect(() => {
+    if (requiresSupabaseLogin && !isAuthReady) return;
+
+    let cancelled = false;
+    const refreshSharedState = async () => {
+      try {
+        if (supabaseStateConfig.enabled) {
+          const result = await loadSupabaseState();
+          if (!cancelled && result.hasState && isFacilityAppState(result.state)) {
+            applyAppSnapshot(result.state, false);
+          }
+          return;
+        }
+
+        const response = await fetch('/api/state', { cache: 'no-store' });
+        if (!response.ok) return;
+        const result = await response.json();
+        if (!cancelled && result.hasState && isFacilityAppState(result.state)) {
+          applyAppSnapshot(result.state, false);
+        }
+      } catch {
+        // Keep the current screen if the shared store is temporarily unavailable.
+      }
+    };
+
+    const intervalId = window.setInterval(refreshSharedState, 20000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
     };
   }, [applyAppSnapshot, isAuthReady, requiresSupabaseLogin, supabaseStateConfig.enabled]);
 
@@ -498,10 +587,45 @@ export default function App() {
     });
   }, [tasks, selectedStatus, searchQuery, showMyTasksOnly, currentUser]);
 
+  const taskById = useMemo(() => new Map(tasks.map((task) => [task.id, task])), [tasks]);
+
+  const visibleNotifications = useMemo(() => {
+    if (currentUser.role === '팀장') return notifications;
+
+    return notifications.filter((notification) => {
+      if (notification.senderName === currentUser.name) return true;
+      const relatedTask = taskById.get(notification.taskId);
+      return Boolean(relatedTask && taskIncludesAssignee(relatedTask.assignee, currentUser.name));
+    });
+  }, [currentUser, notifications, taskById]);
+
+  const assignedTasks = useMemo(() => {
+    if (currentUser.role === '팀장') return [];
+
+    return tasks
+      .filter((task) => taskIncludesAssignee(task.assignee, currentUser.name))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [currentUser, tasks]);
+
+  const activeAssignedTasks = useMemo(
+    () => assignedTasks.filter((task) => task.status !== '완료' || isApprovalPending(task)),
+    [assignedTasks],
+  );
+
+  const newAssignedTasks = useMemo(
+    () => assignedTasks.filter((task) => task.status === '대기중'),
+    [assignedTasks],
+  );
+
+  const unreadAssignedNotifications = useMemo(
+    () => visibleNotifications.filter((notification) => !notification.read).length,
+    [visibleNotifications],
+  );
+
   // Unread notifications count
   const unreadNotifCount = useMemo(() => {
-    return notifications.filter((n) => !n.read).length;
-  }, [notifications]);
+    return visibleNotifications.filter((n) => !n.read).length;
+  }, [visibleNotifications]);
 
   // 5. Actions handlers
 
@@ -559,7 +683,7 @@ export default function App() {
       type: '등록',
       senderName: currentUser.name,
       senderRole: currentUser.role,
-      message: `[업무지정/${data.category}] ${currentUser.name} 팀장이 '${data.title}' 업무를 등록했습니다.`,
+      message: `[배정 알림/${data.category}] ${data.assignee} 담당자에게 '${data.title}' 업무가 배정되었습니다. 업무지정 화면에서 확인 후 조치 내용을 입력해 주세요.`,
       timestamp,
       read: false,
     };
@@ -581,26 +705,15 @@ export default function App() {
       data.priority === '긴급' ? 'urgent' : 'normal'
     );
 
-    if (supabaseStateConfig.enabled) {
-      const snapshotToSave: FacilityAppState = {
-        ...createAppSnapshot(),
-        exportedAt: new Date().toISOString(),
-        tasks: nextTasks,
-        notifications: nextNotifications,
-      };
-
-      void saveSupabaseState(snapshotToSave, authenticatedEmail || currentUser.email || currentUser.name)
-        .then(() => {
-          addToast('온라인 저장 완료', '방금 등록한 업무지정을 공용 저장소에도 저장했습니다.', '✅', 'success');
-        })
-        .catch((error) => {
-          addToast(
-            '온라인 저장 실패',
-            `업무지정은 현재 화면에는 저장됐지만 공용 저장소 저장은 실패했습니다. ${getErrorMessage(error, '연결 상태를 확인해 주세요.')}`,
-            '⚠️',
-          );
-        });
-    }
+    persistSharedState(
+      { tasks: nextTasks, notifications: nextNotifications },
+      {
+        successTitle: '온라인 저장 완료',
+        successMessage: '방금 등록한 업무지정을 공용 저장소에도 저장했습니다.',
+        errorTitle: '온라인 저장 실패',
+        errorMessage: '업무지정은 현재 화면에는 저장됐지만 공용 저장소 저장은 실패했습니다.',
+      },
+    );
 
     // Auto sync to the facility shared calendar if enabled
     const autoSync = localStorage.getItem(SHARED_CALENDAR_AUTO_SYNC_KEY) === 'true';
@@ -628,100 +741,99 @@ export default function App() {
   // Update Status Action (대기중 -> 진행중)
   const handleUpdateStatus = (taskId: string, newStatus: TaskStatus) => {
     const timestamp = new Date().toISOString();
-    setTasks((prev) => 
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const updatedHistory = [
-            ...t.history,
-            {
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: `${currentUser.name} (${currentUser.role})`,
-              action: `작업 단계를 [${t.status}]에서 [${newStatus}]으로 전환했습니다.`
-            }
-          ];
-          return { ...t, status: newStatus, history: updatedHistory };
-        }
-        return t;
-      })
-    );
-
-    // Notify other workers / manager
     const targetTask = tasks.find((t) => t.id === taskId);
-    if (targetTask) {
-      const newNotification: TeamNotification = {
-        id: `notif_${Date.now()}`,
-        taskId,
-        taskTitle: targetTask.title,
-        type: '진행',
-        senderName: currentUser.name,
-        senderRole: currentUser.role,
-        message: `[작업기시] ${currentUser.name} 기사가 '${targetTask.title}' 현장 작업을 개시했습니다.`,
-        timestamp,
-        read: false,
-      };
-      setNotifications((prev) => [newNotification, ...prev]);
-      addToast(
-        '작업 개시 보고',
-        `'${targetTask.title}' 업무 상태를 [진행중]으로 전환했습니다.`,
-        currentUser.avatar,
-        'normal'
-      );
-    }
+    if (!targetTask) return;
+
+    const nextTasks = tasks.map((t) => {
+      if (t.id !== taskId) return t;
+
+      const updatedHistory = [
+        ...t.history,
+        {
+          id: `h_${Date.now()}`,
+          timestamp,
+          user: `${currentUser.name} (${currentUser.role})`,
+          action: `업무를 확인하고 작업 단계를 [${t.status}]에서 [${newStatus}]으로 전환했습니다.`
+        }
+      ];
+      return { ...t, status: newStatus, history: updatedHistory };
+    });
+
+    const newNotification: TeamNotification = {
+      id: `notif_${Date.now()}`,
+      taskId,
+      taskTitle: targetTask.title,
+      type: '진행',
+      senderName: currentUser.name,
+      senderRole: currentUser.role,
+      message: `[업무 확인] ${currentUser.name}님이 '${targetTask.title}' 업무를 확인하고 작업을 시작했습니다.`,
+      timestamp,
+      read: false,
+    };
+    const nextNotifications = [newNotification, ...notifications];
+
+    setTasks(nextTasks);
+    setNotifications(nextNotifications);
+    persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
+    addToast(
+      '업무 확인 완료',
+      `'${targetTask.title}' 업무 상태를 [진행중]으로 전환했습니다.`,
+      currentUser.avatar,
+      'normal'
+    );
   };
 
   // Submit Completion Report (기사 -> 완료보고 사진+글)
   const handleSubmitCompletion = (taskId: string, report: string, photoUrl?: string) => {
     const timestamp = new Date().toISOString();
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const updatedHistory = [
-            ...t.history,
-            {
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: `${currentUser.name} (${currentUser.role})`,
-              action: `기사 조치 완료 현장 보고서를 전송했습니다.`
-            }
-          ];
-          return {
-            ...t,
-            completionReport: report,
-            completionPhotoUrl: photoUrl || t.completionPhotoUrl,
-            // Automatically push to completed task in UI for manager approval, but can keep as "완료" waiting for confirmation
-            status: '완료',
-            completedAt: timestamp,
-            history: updatedHistory
-          };
-        }
-        return t;
-      })
-    );
-
     const targetTask = tasks.find((t) => t.id === taskId);
-    if (targetTask) {
-      const newNotification: TeamNotification = {
-        id: `notif_${Date.now()}`,
-        taskId,
-        taskTitle: targetTask.title,
-        type: '완료보고',
-        senderName: currentUser.name,
-        senderRole: currentUser.role,
-        message: `[완료보고] ${currentUser.name} 기사가 '${targetTask.title}' 기술 조치를 마쳤습니다. 팀장 결재 바랍니다.`,
-        timestamp,
-        read: false,
+    if (!targetTask) return;
+
+    const nextTasks = tasks.map((t) => {
+      if (t.id !== taskId) return t;
+
+      const updatedHistory = [
+        ...t.history,
+        {
+          id: `h_${Date.now()}`,
+          timestamp,
+          user: `${currentUser.name} (${currentUser.role})`,
+          action: `담당자가 조치 내용을 입력하고 완료 보고서를 전송했습니다.`
+        }
+      ];
+      return {
+        ...t,
+        completionReport: report,
+        completionPhotoUrl: photoUrl || t.completionPhotoUrl,
+        status: '완료',
+        completedAt: timestamp,
+        history: updatedHistory
       };
-      setNotifications((prev) => [newNotification, ...prev]);
-      
-      // Notify team
-      addToast(
-        '완료 보고 송신완료',
-        `'${targetTask.title}' 에 관한 현장 조치보고가 송출되었습니다. 나형석 팀장의 최종 승인을 기다립니다.`,
-        currentUser.avatar,
-        'success'
-      );
-    }
+    });
+
+    const newNotification: TeamNotification = {
+      id: `notif_${Date.now()}`,
+      taskId,
+      taskTitle: targetTask.title,
+      type: '완료보고',
+      senderName: currentUser.name,
+      senderRole: currentUser.role,
+      message: `[조치 내용 입력] ${currentUser.name}님이 '${targetTask.title}' 업무 조치 내용을 저장했습니다. 팀장 확인이 필요합니다.`,
+      timestamp,
+      read: false,
+    };
+    const nextNotifications = [newNotification, ...notifications];
+
+    setTasks(nextTasks);
+    setNotifications(nextNotifications);
+    persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
+    
+    addToast(
+      '조치 내용 저장 완료',
+      `'${targetTask.title}' 업무 조치 내용이 저장되었습니다. 나형석 팀장의 최종 승인을 기다립니다.`,
+      currentUser.avatar,
+      'success'
+    );
   };
 
   const handleAttachTaskPhoto = (taskId: string, target: 'reference' | 'completion', photoUrl: string) => {
@@ -742,8 +854,11 @@ export default function App() {
       ],
     });
 
-    setTasks((prev) => prev.map((task) => (task.id === taskId ? updateTask(task) : task)));
-    setSelectedTask((current) => (current?.id === taskId ? updateTask(current) : current));
+    const nextTasks = tasks.map((task) => (task.id === taskId ? updateTask(task) : task));
+    const nextSelectedTask = nextTasks.find((task) => task.id === taskId);
+    setTasks(nextTasks);
+    setSelectedTask((current) => (current?.id === taskId ? nextSelectedTask || current : current));
+    persistSharedState({ tasks: nextTasks });
     addToast('사진 첨부 완료', `${label}이 업무지정에 저장되었습니다.`, '📷', 'success');
   };
 
@@ -758,50 +873,50 @@ export default function App() {
       timestamp,
     };
 
-    setTasks((prev) => 
-      prev.map((t) => {
-        if (t.id === taskId) {
-          const updatedHistory = [
-            ...t.history,
-            {
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: `${currentUser.name} (${currentUser.role})`,
-              action: `현장 의견 교환: "${content.substring(0, 15)}..." 코멘트를 수록했습니다.`
-            }
-          ];
-          return {
-            ...t,
-            comments: [...t.comments, newComment],
-            history: updatedHistory
-          };
-        }
-        return t;
-      })
-    );
-
-    // Notify corresponding workers
     const targetTask = tasks.find((t) => t.id === taskId);
-    if (targetTask) {
-      const newNotification: TeamNotification = {
-        id: `notif_${Date.now()}`,
-        taskId,
-        taskTitle: targetTask.title,
-        type: '댓글',
-        senderName: currentUser.name,
-        senderRole: currentUser.role,
-        message: `[의견교환] '${targetTask.title}' 업무에 ${currentUser.name}님이 코멘트를 남겼습니다.`,
-        timestamp,
-        read: false,
+    if (!targetTask) return;
+
+    const nextTasks = tasks.map((t) => {
+      if (t.id !== taskId) return t;
+
+      const updatedHistory = [
+        ...t.history,
+        {
+          id: `h_${Date.now()}`,
+          timestamp,
+          user: `${currentUser.name} (${currentUser.role})`,
+          action: `현장 의견 교환: "${content.substring(0, 15)}..." 코멘트를 수록했습니다.`
+        }
+      ];
+      return {
+        ...t,
+        comments: [...t.comments, newComment],
+        history: updatedHistory
       };
-      setNotifications((prev) => [newNotification, ...prev]);
-      addToast(
-        '새 의견 등록',
-        `'${targetTask.title}' 업무에 현장 의견이 추가되었습니다.`,
-        currentUser.avatar,
-        'normal'
-      );
-    }
+    });
+
+    const newNotification: TeamNotification = {
+      id: `notif_${Date.now()}`,
+      taskId,
+      taskTitle: targetTask.title,
+      type: '댓글',
+      senderName: currentUser.name,
+      senderRole: currentUser.role,
+      message: `[의견교환] '${targetTask.title}' 업무에 ${currentUser.name}님이 코멘트를 남겼습니다.`,
+      timestamp,
+      read: false,
+    };
+    const nextNotifications = [newNotification, ...notifications];
+
+    setTasks(nextTasks);
+    setNotifications(nextNotifications);
+    persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
+    addToast(
+      '새 의견 등록',
+      `'${targetTask.title}' 업무에 현장 의견이 추가되었습니다.`,
+      currentUser.avatar,
+      'normal'
+    );
   };
 
   // Manager admin actions
@@ -811,89 +926,146 @@ export default function App() {
     payload?: ManagerActionPayload
   ) => {
     const timestamp = new Date().toISOString();
+    const targetTask = tasks.find((task) => task.id === taskId);
+    if (!targetTask) return;
     
     if (actionType === 'delete') {
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      const nextTasks = tasks.filter((t) => t.id !== taskId);
+      setTasks(nextTasks);
       setSelectedTask(null);
+      persistSharedState({ tasks: nextTasks });
       addToast('업무지정 삭제', '해당 업무지정이 데이터베이스에서 삭제/파기되었습니다.', '🗑️');
       return;
     }
 
-    setTasks((prev) => 
-      prev.map((t) => {
-        if (t.id === taskId) {
-          let updatedHistory = [...t.history];
-          let updatedStatus = t.status;
-          let updatedPriority = t.priority;
-          let updatedAssignee = t.assignee;
-          let updatedReport = t.completionReport;
-          let updatedCompletedAt = t.completedAt;
+    let notificationMessage = '';
+    let toastTitle = '';
+    let toastMessage = '';
+    let toastTone: NotificationTone = 'normal';
+    let toastIcon = currentUser.avatar;
 
-          if (actionType === 'approve') {
-            updatedHistory.push({
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: '나형석 (팀장)',
-              action: '조치 완료 보고 심사를 최종 통과 및 [종결 완료] 처리했습니다.'
-            });
-            updatedStatus = '완료';
-            addToast('완료 보고 최종 승인', `'${t.title}' 오더가 최종 종결 처리되었습니다. 수고하셨습니다.`, '✅', 'success');
-          } else if (actionType === 'reject') {
-            // Re-allocate to in progress due to incomplete fix
-            updatedHistory.push({
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: '나형석 (팀장)',
-              action: '보고 반려 및 현장 추가 보완 지시 송출 ([진행중] 원복)'
-            });
-            updatedStatus = '진행중';
-            // Also append alert comment automatically
-            const autoComment: TaskComment = {
-              id: `comment_${Date.now()}`,
-              senderName: '나형석',
-              senderRole: '팀장',
-              content: '⚡ [보완요청 및 반려] 업로드해주신 보고자료를 검토한 결과 미흡 혹은 특이 부동 상태 재발 위험이 있습니다. 추가 세밀 점검과 구동 테스트 전개 바랍니다.',
-              timestamp
-            };
-            t.comments.push(autoComment);
-            updatedReport = undefined; // reset report so they submit again
-            updatedCompletedAt = undefined;
-            addToast('조치 반려 및 추가 보완 지시', `'${t.title}' 담당자에게 추가 피드백 보완 명시가 전달되었습니다.`, '⚠️', 'urgent');
-          } else if (actionType === 'change_priority') {
-            updatedHistory.push({
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: '나형석 (팀장)',
-              action: `해당 오더 우선순위를 [${t.priority}]에서 [${payload}] 수준으로 조율했습니다.`
-            });
-            updatedPriority = payload;
-          } else if (actionType === 'change_assignee') {
-            updatedHistory.push({
-              id: `h_${Date.now()}`,
-              timestamp,
-              user: '나형석 (팀장)',
-              action: `현장 인력 배치 조정: 기존 담당자 [${t.assignee}]에서 [${payload}] 담당자로 재배정되었습니다.`
-            });
-            updatedAssignee = payload;
+    const nextTasks = tasks.map((t) => {
+      if (t.id !== taskId) return t;
+
+      let updatedHistory = [...t.history];
+      let updatedStatus = t.status;
+      let updatedPriority = t.priority;
+      let updatedAssignee = t.assignee;
+      let updatedReport = t.completionReport;
+      let updatedCompletedAt = t.completedAt;
+      let updatedComments = t.comments;
+
+      if (actionType === 'approve') {
+        updatedHistory = [
+          ...updatedHistory,
+          {
+            id: `h_${Date.now()}`,
+            timestamp,
+            user: `${currentUser.name} (${currentUser.role})`,
+            action: '조치 완료 보고 심사를 최종 통과 및 [종결 완료] 처리했습니다.'
           }
+        ];
+        updatedStatus = '완료';
+        notificationMessage = `[완료 승인] '${t.title}' 업무 조치가 최종 승인되었습니다.`;
+        toastTitle = '완료 보고 최종 승인';
+        toastMessage = `'${t.title}' 업무가 최종 종결 처리되었습니다.`;
+        toastTone = 'success';
+        toastIcon = '✅';
+      } else if (actionType === 'reject') {
+        updatedHistory = [
+          ...updatedHistory,
+          {
+            id: `h_${Date.now()}`,
+            timestamp,
+            user: `${currentUser.name} (${currentUser.role})`,
+            action: '보고 반려 및 현장 추가 보완 지시 송출 ([진행중] 원복)'
+          }
+        ];
+        updatedStatus = '진행중';
+        const autoComment: TaskComment = {
+          id: `comment_${Date.now()}`,
+          senderName: currentUser.name,
+          senderRole: currentUser.role,
+          content: '⚡ [보완요청 및 반려] 업로드해주신 보고자료를 검토한 결과 추가 점검 또는 보완이 필요합니다. 보완 후 조치 내용을 다시 입력해 주세요.',
+          timestamp
+        };
+        updatedComments = [...t.comments, autoComment];
+        updatedReport = undefined;
+        updatedCompletedAt = undefined;
+        notificationMessage = `[보완 요청] '${t.title}' 업무가 보완 요청으로 돌아왔습니다. 담당자는 조치 내용을 다시 입력해 주세요.`;
+        toastTitle = '조치 반려 및 추가 보완 지시';
+        toastMessage = `'${t.title}' 담당자에게 추가 피드백이 전달되었습니다.`;
+        toastTone = 'urgent';
+        toastIcon = '⚠️';
+      } else if (actionType === 'change_priority') {
+        updatedHistory = [
+          ...updatedHistory,
+          {
+            id: `h_${Date.now()}`,
+            timestamp,
+            user: `${currentUser.name} (${currentUser.role})`,
+            action: `해당 업무 우선순위를 [${t.priority}]에서 [${payload}] 수준으로 조율했습니다.`
+          }
+        ];
+        updatedPriority = payload as TaskPriority;
+        notificationMessage = `[우선순위 변경] '${t.title}' 업무 우선순위가 [${payload}]로 변경되었습니다.`;
+        toastTitle = '우선순위 변경';
+        toastMessage = `'${t.title}' 업무 우선순위를 변경했습니다.`;
+      } else if (actionType === 'change_assignee') {
+        updatedHistory = [
+          ...updatedHistory,
+          {
+            id: `h_${Date.now()}`,
+            timestamp,
+            user: `${currentUser.name} (${currentUser.role})`,
+            action: `현장 인력 배치 조정: 기존 담당자 [${t.assignee}]에서 [${payload}] 담당자로 재배정되었습니다.`
+          }
+        ];
+        updatedAssignee = String(payload || t.assignee);
+        notificationMessage = `[재배정 알림] '${t.title}' 업무가 ${updatedAssignee} 담당자에게 재배정되었습니다.`;
+        toastTitle = '담당자 재배정';
+        toastMessage = `'${t.title}' 업무 담당자를 ${updatedAssignee}(으)로 변경했습니다.`;
+      }
 
-          return {
-            ...t,
-            status: updatedStatus,
-            priority: updatedPriority,
-            assignee: updatedAssignee,
-            completionReport: updatedReport,
-            completedAt: updatedCompletedAt,
-            history: updatedHistory
-          };
+      return {
+        ...t,
+        status: updatedStatus,
+        priority: updatedPriority,
+        assignee: updatedAssignee,
+        completionReport: updatedReport,
+        completedAt: updatedCompletedAt,
+        comments: updatedComments,
+        history: updatedHistory
+      };
+    });
+
+    const newNotification: TeamNotification | null = notificationMessage
+      ? {
+          id: `notif_${Date.now()}`,
+          taskId,
+          taskTitle: targetTask.title,
+          type: actionType === 'approve' || actionType === 'reject' ? '완료보고' : '등록',
+          senderName: currentUser.name,
+          senderRole: currentUser.role,
+          message: notificationMessage,
+          timestamp,
+          read: false,
         }
-        return t;
-      })
-    );
+      : null;
+    const nextNotifications = newNotification ? [newNotification, ...notifications] : notifications;
+
+    setTasks(nextTasks);
+    setNotifications(nextNotifications);
+    persistSharedState({ tasks: nextTasks, notifications: nextNotifications });
+
+    if (toastTitle) {
+      addToast(toastTitle, toastMessage, toastIcon, toastTone);
+    }
   };
 
   const handleMarkAllNotificationsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const visibleIds = new Set(visibleNotifications.map((notification) => notification.id));
+    setNotifications((prev) => prev.map((n) => (visibleIds.has(n.id) ? { ...n, read: true } : n)));
   };
 
   const handleNotificationClick = (taskId: string, notifId: string) => {
@@ -903,6 +1075,12 @@ export default function App() {
     );
     const target = tasks.find((t) => t.id === taskId);
     if (target) {
+      setActiveTab('tasks');
+      setSelectedStatus('전체');
+      setSearchQuery('');
+      if (currentUser.role !== '팀장') {
+        setShowMyTasksOnly(true);
+      }
       setSelectedTask(target);
     }
     setShowNotifications(false);
@@ -1043,12 +1221,12 @@ export default function App() {
                   </div>
                   
                   <div className="flex-grow overflow-y-auto divide-y divide-slate-800/60">
-                    {notifications.length === 0 ? (
+                    {visibleNotifications.length === 0 ? (
                       <div className="p-8 text-center text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-                        표시할 실시간 변동 보고가 없습니다.
+                        현재 계정에 표시할 업무 알림이 없습니다.
                       </div>
                     ) : (
-                      notifications.map((notif) => (
+                      visibleNotifications.map((notif) => (
                         <div
                           key={notif.id}
                           onClick={() => handleNotificationClick(notif.taskId, notif.id)}
@@ -1192,6 +1370,67 @@ export default function App() {
             </span>
           </button>
         </div>
+
+        {currentUser.role !== '팀장' && (
+          <section className="bg-emerald-500/10 border border-emerald-500/30 rounded-3xl p-4 sm:p-5 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-2 text-emerald-200 font-black text-base">
+                  <BellRing className="w-5 h-5 text-emerald-300" />
+                  내 배정 업무 안내
+                </span>
+                <span className="px-2.5 py-1 rounded-lg bg-slate-950/70 border border-emerald-500/20 text-xs text-emerald-200 font-black">
+                  진행 필요 {activeAssignedTasks.length}건
+                </span>
+                {unreadAssignedNotifications > 0 && (
+                  <span className="px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-xs text-rose-200 font-black">
+                    새 알림 {unreadAssignedNotifications}건
+                  </span>
+                )}
+              </div>
+              <p className="mt-2 text-sm text-slate-200 font-semibold leading-relaxed">
+                {newAssignedTasks.length > 0
+                  ? `${currentUser.name}님에게 새로 배정된 대기 업무가 ${newAssignedTasks.length}건 있습니다. 업무지정에서 확인 후 조치 내용을 입력해 주세요.`
+                  : activeAssignedTasks.length > 0
+                    ? `${currentUser.name}님이 처리 중이거나 승인 대기 중인 업무가 ${activeAssignedTasks.length}건 있습니다.`
+                    : `${currentUser.name}님에게 현재 진행할 배정 업무는 없습니다.`}
+              </p>
+              {activeAssignedTasks.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {activeAssignedTasks.slice(0, 3).map((task) => (
+                    <button
+                      key={task.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('tasks');
+                        setSelectedStatus('전체');
+                        setSearchQuery('');
+                        setShowMyTasksOnly(true);
+                        setSelectedTask(task);
+                      }}
+                      className="max-w-full truncate rounded-xl border border-emerald-500/20 bg-slate-950/70 px-3 py-2 text-left text-xs text-slate-100 font-bold hover:border-emerald-400/60 hover:text-white"
+                    >
+                      [{getTaskStatusLabel(task)}] {task.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('tasks');
+                setSelectedStatus('전체');
+                setSearchQuery('');
+                setShowMyTasksOnly(true);
+                setViewMode('grid');
+              }}
+              className="shrink-0 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-3 text-sm font-black shadow-lg border border-emerald-400/30"
+            >
+              내 배정 업무 보기
+            </button>
+          </section>
+        )}
 
         {activeTab === 'tasks' ? (
           <>

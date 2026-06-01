@@ -58,7 +58,7 @@ export default function TaskDetailModal({
   const isAssignee = taskIncludesAssignee(task.assignee, currentUser.name);
   const primaryAssignee = splitTaskAssignees(task.assignee)[0] || '';
   const isCompletionApproved = hasCompletionApproval(task);
-  const canWorkOn = isAssignee && !isManager;
+  const canWorkOn = isAssignee && !isCompletionApproved;
   const canAttachPhotos = isManager || isAssignee;
 
   // Format date readable
@@ -349,33 +349,43 @@ export default function TaskDetailModal({
               {/* Technician Controller */}
               {canWorkOn && (
                 <div className="space-y-3">
+                  <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100 font-semibold leading-relaxed">
+                    <div className="font-black text-emerald-300 mb-1">내 담당 업무입니다.</div>
+                    업무를 확인한 뒤 진행을 시작하거나, 현장에서 조치한 내용을 아래 입력칸에 바로 저장할 수 있습니다.
+                  </div>
+
                   {task.status === '대기중' && (
                     <button
                       onClick={() => onUpdateStatus(task.id, '진행중')}
                       className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs rounded-xl flex items-center justify-center space-x-1.5 cursor-pointer transition-colors shadow-lg shadow-amber-500/10"
                     >
                       <Clock className="w-4 h-4 text-slate-950" />
-                      <span>업무 개시 ([진행중]으로 전환)</span>
+                      <span>업무 확인 및 조치 시작 ([진행중]으로 전환)</span>
                     </button>
                   )}
 
                   {/* Submission reporting Form */}
-                  {(task.status === '진행중' || task.status === '완료') && (
+                  {(task.status === '대기중' || task.status === '진행중' || task.status === '완료') && (
                     <form onSubmit={handleReportSubmit} className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3.5 shadow-xl">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-black text-slate-300 flex items-center gap-1.5">
                           <Check className="w-4 h-4 text-emerald-400" />
-                          <span>완료 실증 조거 보고서 작성</span>
+                          <span>조치 내용 입력</span>
                         </span>
                         {task.status === '완료' && (
                           <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] px-2 py-0.5 rounded font-black uppercase tracking-wider">재수정 송신</span>
                         )}
                       </div>
+                      {task.status === '대기중' && (
+                        <p className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[10px] text-amber-200 font-bold leading-relaxed">
+                          아직 대기중인 업무입니다. 먼저 위 버튼으로 진행중 전환을 하거나, 조치가 끝났다면 아래에 결과를 입력해 바로 완료 보고할 수 있습니다.
+                        </p>
+                      )}
 
                       <textarea
                         value={reportText}
                         onChange={(e) => setReportText(e.target.value)}
-                        placeholder="조치한 결과 완료부속 사양 및 특이 시설정보를 입력하십시오..."
+                        placeholder="확인한 내용, 실제 조치 사항, 남은 문제, 추가 필요 사항을 입력해 주세요."
                         className="w-full p-3 text-xs border border-slate-800 rounded-xl outline-none focus:border-indigo-400 bg-slate-950 block h-20 text-white font-semibold placeholder:text-slate-600"
                         required
                       />
@@ -419,7 +429,7 @@ export default function TaskDetailModal({
                         className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-505 text-white font-black text-[11px] uppercase tracking-wider rounded-xl transition-all cursor-pointer flex items-center justify-center space-x-1.5 shadow-lg border border-emerald-500/20 shadow-emerald-500/10"
                       >
                         <Send className="w-4 h-4 text-white" />
-                        <span>팀장에게 조치 완료보고 송신</span>
+                        <span>조치 내용 저장 및 팀장에게 보고</span>
                       </button>
                     </form>
                   )}
