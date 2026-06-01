@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Task, UserProfile, TaskComment, TaskStatus, TaskPriority } from '../types';
 import { X, Send, Camera, Clock, Check, RefreshCw, MessageSquare, History, MapPin, Trash2, ShieldAlert, Calendar } from 'lucide-react';
 import { isCompletionApproved as hasCompletionApproval } from '../lib/taskState';
@@ -12,6 +12,7 @@ interface TaskDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
+  focusActionPanel?: boolean;
   onUpdateStatus: (taskId: string, newStatus: TaskStatus) => void;
   onSubmitCompletion: (taskId: string, report: string, photoUrl?: string) => void;
   onAddComment: (taskId: string, content: string) => void;
@@ -32,6 +33,7 @@ export default function TaskDetailModal({
   isOpen,
   onClose,
   currentUser,
+  focusActionPanel = false,
   onUpdateStatus,
   onSubmitCompletion,
   onAddComment,
@@ -52,6 +54,19 @@ export default function TaskDetailModal({
   const referenceFileInputRef = useRef<HTMLInputElement>(null);
   const completionFileInputRef = useRef<HTMLInputElement>(null);
   const reportFileInputRef = useRef<HTMLInputElement>(null);
+  const actionPanelRef = useRef<HTMLDivElement>(null);
+  const reportTextAreaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (!isOpen || !focusActionPanel) return;
+
+    const timerId = window.setTimeout(() => {
+      actionPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      reportTextAreaRef.current?.focus();
+    }, 120);
+
+    return () => window.clearTimeout(timerId);
+  }, [focusActionPanel, isOpen, task.id]);
 
   if (!isOpen) return null;
 
@@ -356,7 +371,7 @@ export default function TaskDetailModal({
 
               {/* Technician Controller */}
               {canWorkOn && (
-                <div className="space-y-3">
+                <div ref={actionPanelRef} className="space-y-3">
                   <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100 font-semibold leading-relaxed">
                     <div className="font-black text-emerald-300 mb-1">내 담당 업무입니다.</div>
                     업무를 확인한 뒤 진행을 시작하거나, 현장에서 조치한 내용을 아래 입력칸에 바로 저장할 수 있습니다.
@@ -412,6 +427,7 @@ export default function TaskDetailModal({
                       )}
 
                       <textarea
+                        ref={reportTextAreaRef}
                         value={reportText}
                         onChange={(e) => setReportText(e.target.value)}
                         placeholder="확인한 내용, 실제 조치 사항, 남은 문제, 추가 필요 사항을 입력해 주세요."

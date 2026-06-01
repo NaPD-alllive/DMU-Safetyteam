@@ -150,6 +150,7 @@ export default function App() {
 
   // 3. Modals and panels
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [focusTaskActionPanel, setFocusTaskActionPanel] = useState(false);
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showManual, setShowManual] = useState(false);
@@ -313,6 +314,16 @@ export default function App() {
     window.location.assign(SUPPLY_PURCHASE_REQUEST_URL);
   };
 
+  const openTaskDetail = (task: Task, focusActionPanel = false) => {
+    setFocusTaskActionPanel(focusActionPanel);
+    setSelectedTask(task);
+  };
+
+  const closeTaskDetail = () => {
+    setFocusTaskActionPanel(false);
+    setSelectedTask(null);
+  };
+
   const createAppSnapshot = useCallback((overrides: Partial<FacilityAppState> = {}): FacilityAppState => ({
     app: 'DMU_FACILITY_MANAGEMENT',
     version: 1,
@@ -396,7 +407,7 @@ export default function App() {
     setSoundEnabled(Boolean(snapshot.soundEnabled));
     localStorage.setItem('fms_sound_enabled', String(Boolean(snapshot.soundEnabled)));
     if (resetView) {
-      setSelectedTask(null);
+      closeTaskDetail();
       setSelectedStatus('전체');
       setSearchQuery('');
       setShowMyTasksOnly(currentUser.role !== '팀장');
@@ -628,6 +639,21 @@ export default function App() {
     return visibleNotifications.filter((n) => !n.read).length;
   }, [visibleNotifications]);
 
+  const markNotificationsReadByIds = (notificationIds: Set<string>) => {
+    if (notificationIds.size === 0) return;
+
+    let changed = false;
+    const nextNotifications = notifications.map((notification) => {
+      if (!notificationIds.has(notification.id) || notification.read) return notification;
+      changed = true;
+      return { ...notification, read: true };
+    });
+
+    if (!changed) return;
+    setNotifications(nextNotifications);
+    persistSharedState({ notifications: nextNotifications });
+  };
+
   const scrollToTaskList = useCallback(() => {
     window.setTimeout(() => {
       taskListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -636,7 +662,7 @@ export default function App() {
 
   const showAssignedTaskList = useCallback(() => {
     setActiveTab('tasks');
-    setSelectedTask(null);
+    closeTaskDetail();
     setSelectedStatus('전체');
     setSearchQuery('');
     setShowMyTasksOnly(true);
@@ -809,11 +835,11 @@ export default function App() {
 
     if (task.status === '대기중') {
       handleUpdateStatus(task.id, '진행중');
-      setSelectedTask({ ...task, status: '진행중' });
+      openTaskDetail({ ...task, status: '진행중' }, true);
       return;
     }
 
-    setSelectedTask(task);
+    openTaskDetail(task, true);
   };
 
   // Submit Completion Report (기사 -> 완료보고 사진+글)
@@ -965,7 +991,7 @@ export default function App() {
     if (actionType === 'delete') {
       const nextTasks = tasks.filter((t) => t.id !== taskId);
       setTasks(nextTasks);
-      setSelectedTask(null);
+      closeTaskDetail();
       persistSharedState({ tasks: nextTasks });
       addToast('업무지정 삭제', '해당 업무지정이 데이터베이스에서 삭제/파기되었습니다.', '🗑️');
       return;
@@ -1097,15 +1123,20 @@ export default function App() {
   };
 
   const handleMarkAllNotificationsRead = () => {
-    const visibleIds = new Set(visibleNotifications.map((notification) => notification.id));
-    setNotifications((prev) => prev.map((n) => (visibleIds.has(n.id) ? { ...n, read: true } : n)));
+    const visibleIds = new Set<string>(visibleNotifications.map((notification) => notification.id));
+    markNotificationsReadByIds(visibleIds);
+  };
+
+  const handleNotificationBellClick = () => {
+    const willOpen = !showNotifications;
+    setShowNotifications(willOpen);
+    if (willOpen) {
+      handleMarkAllNotificationsRead();
+    }
   };
 
   const handleNotificationClick = (taskId: string, notifId: string) => {
-    // Mark specifically as read
-    setNotifications((prev) => 
-      prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
-    );
+    markNotificationsReadByIds(new Set([notifId]));
     const target = tasks.find((t) => t.id === taskId);
     if (target) {
       setActiveTab('tasks');
@@ -1114,7 +1145,7 @@ export default function App() {
       if (currentUser.role !== '팀장') {
         setShowMyTasksOnly(true);
       }
-      setSelectedTask(target);
+      openTaskDetail(target);
     }
     setShowNotifications(false);
   };
@@ -1219,7 +1250,7 @@ export default function App() {
             {/* Notification Center Popover Trigger */}
             <div className="relative">
               <button
-                onClick={() => setShowNotifications(!showNotifications)}
+                onClick={handleNotificationBellClick}
                 className={`p-2 rounded-xl border transition-all cursor-pointer relative ${
                   showNotifications 
                     ? 'bg-slate-800 text-white border-slate-600' 
@@ -1439,7 +1470,7 @@ export default function App() {
                         setSelectedStatus('전체');
                         setSearchQuery('');
                         setShowMyTasksOnly(true);
-                        setSelectedTask(task);
+                        openTaskDetail(task, true);
                       }}
                       className="max-w-full truncate rounded-xl border border-emerald-500/20 bg-slate-950/70 px-3 py-2 text-left text-xs text-slate-100 font-bold hover:border-emerald-400/60 hover:text-white"
                     >
@@ -1633,7 +1664,7 @@ export default function App() {
               <TaskCard 
                 key={task.id} 
                 task={task} 
-                onSelect={(t) => setSelectedTask(t)} 
+                onSelect={(t) => openTaskDetail(t)} 
                 onAssigneeAction={handleAssigneeTaskAction}
                 isSynced={syncedTaskIds.includes(task.id)}
                 isCurrentUserAssignee={currentUser.role !== '팀장' && taskIncludesAssignee(task.assignee, currentUser.name)}
@@ -1660,7 +1691,7 @@ export default function App() {
                   {filteredTasks.map((t) => (
                     <tr 
                       key={t.id}
-                      onClick={() => setSelectedTask(t)}
+                      onClick={() => openTaskDetail(t)}
                       className="hover:bg-slate-900/40 cursor-pointer transition-colors"
                     >
                       <td className="p-4">
@@ -1792,8 +1823,9 @@ export default function App() {
         <TaskDetailModal
           task={selectedTask}
           isOpen={!!selectedTask}
-          onClose={() => setSelectedTask(null)}
+          onClose={closeTaskDetail}
           currentUser={currentUser}
+          focusActionPanel={focusTaskActionPanel}
           onUpdateStatus={handleUpdateStatus}
           onSubmitCompletion={handleSubmitCompletion}
           onAddComment={handleAddComment}
