@@ -70,11 +70,19 @@ export const useFacilities = () => {
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const pageItems = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  const addFacility = (values: FacilityFormValues) =>
-    setFacilities((previous) => [createFacility(values), ...previous]);
+  const addFacility = (values: FacilityFormValues) => {
+    const facility = createFacility(values);
+    setFacilities((previous) => [facility, ...previous]);
+    return facility;
+  };
 
-  const saveFacility = (id: string, values: FacilityFormValues) =>
-    setFacilities((previous) => previous.map((item) => (item.id === id ? updateFacility(item, values) : item)));
+  const saveFacility = (id: string, values: FacilityFormValues) => {
+    const target = facilities.find((item) => item.id === id);
+    if (!target) return null;
+    const savedFacility = updateFacility(target, values);
+    setFacilities((previous) => previous.map((item) => (item.id === id ? savedFacility : item)));
+    return savedFacility;
+  };
 
   const deleteFacility = (id: string) =>
     setFacilities((previous) => previous.filter((item) => item.id !== id));

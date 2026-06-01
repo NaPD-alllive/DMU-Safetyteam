@@ -206,13 +206,22 @@ export default function FacilityAdminPage({
   };
 
   const saveForm = (values: FacilityFormValues) => {
+    store.setQuery('');
+    store.setCategory('전체');
+    store.setStatus('전체');
+    store.setPage(1);
+    setFacilityListOpen(true);
+    setViewMode('cards');
+
     if (editing) {
-      store.saveFacility(editing.id, values);
+      const savedFacility = store.saveFacility(editing.id, values);
+      if (savedFacility) setSelected(savedFacility);
       addToast('대관 시설 수정 완료', `${values.name} 시설 정보를 수정했습니다.`, '🏢');
       setEditing(null);
       return;
     }
-    store.addFacility(values);
+    const createdFacility = store.addFacility(values);
+    setSelected(createdFacility);
     addToast('대관 시설 등록 완료', `${values.name} 시설을 등록했습니다.`, '🏢');
   };
 
