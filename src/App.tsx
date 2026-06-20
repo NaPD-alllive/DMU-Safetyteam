@@ -1197,6 +1197,7 @@ export default function App() {
                 <span className="hidden sm:inline-flex bg-indigo-500/10 text-indigo-400 border border-indigo-505/20 font-mono text-[9px] px-2 py-0.5 rounded font-black tracking-widest uppercase">REAL-TIME</span>
               </h1>
               <p className="text-[10px] text-slate-300 font-black uppercase tracking-widest mt-1">v1.0.4 OPS CENTER COLLABORATION</p>
+              <p className="text-[9px] text-slate-500 font-semibold mt-1 leading-tight">@ 2026 Developed by 사무처 시설관리팀장 나형석</p>
             </div>
           </div>
 
