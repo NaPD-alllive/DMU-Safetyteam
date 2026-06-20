@@ -1,7 +1,7 @@
 import { Task } from '../types';
 
 export const isCompletionApproved = (task: Task) =>
-  task.history.some((log) => log.action.includes('최종 통과'));
+  Array.isArray(task.history) && task.history.some((log) => log?.action?.includes('최종 통과') === true);
 
 export const isApprovalPending = (task: Task) =>
   task.status === '완료' && Boolean(task.completionReport) && !isCompletionApproved(task);

@@ -24,10 +24,10 @@ import {
 import { getErrorMessage } from './lib/errors';
 import { getTaskStatusLabel, isApprovalPending } from './lib/taskState';
 import { formatTaskAssigneeLabel, taskIncludesAssignee } from './lib/taskAssignees';
-import { normalizeWorkCategory } from './lib/workCategories';
 import { clearStoredSupabaseAuthSession } from './lib/supabaseAuth';
 import { isPrimaryAdminUser } from './lib/teamMembers';
 import { getSupabaseStateConfig, loadSupabaseState, saveSupabaseState } from './lib/supabaseState';
+import { normalizeTasks } from './lib/taskNormalization';
 import {
   isFacilityModuleSnapshot,
   readFacilityModuleSnapshot,
@@ -84,9 +84,10 @@ const readStoredTasks = () => {
 
   try {
     const parsed = JSON.parse(saved) as unknown;
-    return Array.isArray(parsed)
-      ? (parsed as Task[]).map((task) => ({ ...task, category: normalizeWorkCategory(task.category || '') }))
-      : DEFAULT_TASKS;
+    if (!Array.isArray(parsed)) return DEFAULT_TASKS;
+
+    const normalizedTasks = normalizeTasks(parsed);
+    return parsed.length > 0 && normalizedTasks.length === 0 ? DEFAULT_TASKS : normalizedTasks;
   } catch {
     return DEFAULT_TASKS;
   }
@@ -301,12 +302,23 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!requiresSupabaseLogin || !isAuthReady) return;
+
+    const scrollFrame = window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    });
+
+    return () => window.cancelAnimationFrame(scrollFrame);
+  }, [authenticatedEmail, isAuthReady, requiresSupabaseLogin]);
+
   const handleSignOut = () => {
     clearStoredSupabaseAuthSession();
     setAuthenticatedEmail(null);
     setCurrentUser(DEFAULT_USERS[0]);
     setIsAuthReady(!requiresSupabaseLogin);
     setShowNotifications(false);
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     addToast('로그아웃 완료', '다시 사용하려면 직원 이메일과 비밀번호로 로그인해 주세요.', '🔒');
   };
 
@@ -328,7 +340,7 @@ export default function App() {
     app: 'DMU_FACILITY_MANAGEMENT',
     version: 1,
     exportedAt: new Date().toISOString(),
-    tasks: overrides.tasks ?? tasks,
+    tasks: normalizeTasks(overrides.tasks ?? tasks),
     notifications: overrides.notifications ?? notifications,
     dailyLogs: overrides.dailyLogs ?? dailyLogs,
     syncedTaskIds: overrides.syncedTaskIds ?? syncedTaskIds,
@@ -391,7 +403,7 @@ export default function App() {
       throw new Error('시설관리 시스템 데이터 형식이 아닙니다.');
     }
 
-    setTasks(snapshot.tasks.map((task) => ({ ...task, category: normalizeWorkCategory(task.category || '') })));
+    setTasks(normalizeTasks(snapshot.tasks));
     setNotifications(snapshot.notifications);
     setDailyLogs(snapshot.dailyLogs);
     setSyncedTaskIds(Array.isArray(snapshot.syncedTaskIds) ? snapshot.syncedTaskIds : []);
