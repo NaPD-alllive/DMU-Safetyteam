@@ -6,6 +6,13 @@
 }}>
   @ 2026 Developed by 사무처 시설관리팀장 나형석
 </div>
+useEffect(() => {
+  // 페이지 로드 시 강제 새로고침으로 빈 화면 문제 해결
+  const timer = setTimeout(() => {
+    window.location.reload();
+  }, 500);
+  return () => clearTimeout(timer);
+}, []);
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Task, UserProfile, TeamNotification, TaskStatus, TaskPriority, TaskComment, DailyLog, FacilityAppState } from './types';
 import { DEFAULT_USERS, DEFAULT_TASKS, DEFAULT_NOTIFICATIONS, DEFAULT_DAILY_LOGS } from './initialData';
