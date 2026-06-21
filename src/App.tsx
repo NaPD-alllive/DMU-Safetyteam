@@ -1,3 +1,11 @@
+<div style={{ 
+  textAlign: 'center', 
+  fontSize: '12px', 
+  color: '#666',
+  marginTop: '5px'
+}}>
+  @ 2026 Developed by 사무처 시설관리팀장 나형석
+</div>
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Task, UserProfile, TeamNotification, TaskStatus, TaskPriority, TaskComment, DailyLog, FacilityAppState } from './types';
 import { DEFAULT_USERS, DEFAULT_TASKS, DEFAULT_NOTIFICATIONS, DEFAULT_DAILY_LOGS } from './initialData';
